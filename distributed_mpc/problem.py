@@ -12,7 +12,6 @@ class quadProblem:
     def __init__(self, dynamics):
         self.dynamics = dynamics #a list of dynamical models
         
-
     def split(self, graph):
 
         split_dynamics = self.dynamics.split(graph)
@@ -33,7 +32,7 @@ class quadProblem:
         return self.dynamics.ids.copy()
     
     def __repr__(self):
-        return f"ilqrProblem(\n\t{self.dynamics},\n\t{self.game_cost}\n)"
+        return f"MPCProblem(\n\t{self.dynamics})"
 
         
 

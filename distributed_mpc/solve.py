@@ -5,28 +5,44 @@ from dynamics import *
 from util import *
 
 
-class SolveMPC(problem,dynamics):
+class SolveMPC:
     
-    def __init__(self,problem,dynamics):
+    def __init__(self,problem,dynamics,N):
+        self.dynamics = dynamics
+        self.problem = problem
+        self.N = N
+        self.dt = self.dynamics.T/self.N #length of a control interval
         
-        dt = dynamics.T/N #length of a control interval
-        N = dynamics.N
+        self.n_states = 6
+        self.n_inputs = 3
+        self.n_agents = self.dynamics.n_x/self.n_states
         
         
-        #minimize objective:
-        dynamics.opti.minimize(objective)
+       
         
-        #dynamic constraints for a single (6D)quadcopter:
-        g = 9.81
-        f = lambda x,u: vertcat(x[3],x[4],x[5],g*tan([0]),-g*tan(u[1]),u[2]-g) #dx/dt = f(x,u)
+       
+    g = 9.81
+    
+    def min_obj(objective):
         
-        for k in range(N): #loop over control intervals
+        self.dynamics.opti.minimize(objective) 
+    
+    # lambda x,u: vertcat(x[3],x[4],x[5],g*tan([0]),-g*tan(u[1]),u[2]-g) #dx/dt = f(x,u)
+    def f(x,u):
+        #TODO: determine subproblem and re-construct dynamics
+        return vertcat(x[3],x[4],x[5],g*tan([0]),-g*tan(u[1]),u[2]-g) #dx/dt = f(x,u)
+        
+     
+    
+    def solve(dynamics):
+        
+        for k in range(self.N): #loop over control intervals
             # Runge-Kutta 4 integration
             k1 = f(dynamics.X[:,k],         dynamics.U[:,k])
-            k2 = f(dynamics.X[:,k]+dt/2*k1, dynamics.U[:,k])
-            k3 = f(dynamics.X[:,k]+dt/2*k2, dynamics.U[:,k])
-            k4 = f(dynamics.X[:,k]+dt*k3,   dynamics.U[:,k])
-            x_next = dynamics.X[:,k] + dt/6*(k1+2*k2+2*k3+k4) 
+            k2 = f(dynamics.X[:,k]+self.dt/2*k1, dynamics.U[:,k])
+            k3 = f(dynamics.X[:,k]+self.dt/2*k2, dynamics.U[:,k])
+            k4 = f(dynamics.X[:,k]+self.dt*k3,   dynamics.U[:,k])
+            x_next = dynamics.X[:,k] + self.dt/6*(k1+2*k2+2*k3+k4) 
 
             opti.subject_to(dynamics.X[:,k+1]==x_next) # close the gaps
 
@@ -57,8 +73,6 @@ class SolveMPC(problem,dynamics):
 
             #initial values for solver
             dynamics.opti.set_initial(dynamics.T, 0)
-            
-    def solve(dynamics):
         
         dynamics.opti.solver("ipopt")
         dynamics.sol = dynamics.opti.solve()

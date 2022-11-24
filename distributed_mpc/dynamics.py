@@ -61,9 +61,9 @@ class quadDynamics6D(DynamicalModel):
     """
     def __init__(self, xf, Q, R, Qf, u_ref, N, *args, **kwargs):
         super().__init__(6,3,*args,**kwargs)
-
-        self.opti = Opti()
         
+        self.opti = Opti()
+    
         #decision variables:
         self.X = self.opti.variable(6, N+1)
         self.U = self.opti.variable(3, N)
