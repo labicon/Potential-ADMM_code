@@ -1,2 +1,1 @@
-# distributed_opt
-A codebase for distributed opotimization based on IPOPT
+# Potential-distributed model predictive control using Casadi
