@@ -7,20 +7,18 @@ from util import *
 
 class SolveMPC:
     
-    def __init__(self,problem,dynamics,N):
-        self.dynamics = dynamics
+    def __init__(self,problem,N):
+        self.opti = Opti()
+        self.dynamics = problem.dynamics
         self.problem = problem
         self.N = N
-        self.dt = self.dynamics.T/self.N #length of a control interval
+        self.T = opti.variable()
+        self.dt = /self.N #length of a control interval
         
         self.n_states = 6
         self.n_inputs = 3
-        self.n_agents = self.dynamics.n_x/self.n_states
-        
-        
-       
-        
-       
+        self.n_agents = self.dynamics.n_players
+             
     g = 9.81
     
     def min_obj(objective):
@@ -46,10 +44,11 @@ class SolveMPC:
 
             opti.subject_to(dynamics.X[:,k+1]==x_next) # close the gaps
 
-            #inequality constraints:
+            #inequality constraints(for a single quad):
+            #TODO: generalize to n quadcopter dynamics
 
             dynamics.opti.subject_to(dynamics.X[2,:]<=3.5) # altitude p_z is limited
-            dynamics.opti.subject_to(0<=dynamics.X[2,:])
+            dynamics.opti.subject_to(0.6<=dynamics.X[2,:])
 
             dynamics.opti.subject_to(dynamics.X[0,:]<=4) # p_x is limited
             dynamics.opti.subject_to(-4<=dynamics.X[0,:])
