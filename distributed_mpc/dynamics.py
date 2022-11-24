@@ -73,11 +73,9 @@ class quadDynamics6D(DynamicalModel):
         self.Q = Q
         self.R = R
         self.Qf = Qf
-        self.u_ref = u_ref
-        
-        #dynamic constraints:
-        g = 9.81
-        self._f = lambda x,u: vertcat(x[3],x[4],x[5],g*tan([0]),-g*tan(u[1]),u[2]-g) #dx/dt = f(x,u)
+        self.u_ref = u_ref  
+        self.N = N
+    
     
     def cost(self):
         #u_ref is shape (3,1)
