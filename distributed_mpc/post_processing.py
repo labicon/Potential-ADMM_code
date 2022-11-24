@@ -1,6 +1,6 @@
 from pylab import plot, step, figure, legend, show, spy
 from casadi import *
-from nlp import *
+from distributed_mpc.problem import *
 
 def postProcess(quadProblem):
 

@@ -1,33 +1,29 @@
 import numpy as np
 from casadi import *
 import do_mpc
-from model import *
-from util import all
+from dynamics import *
+from util import *
 
 g = 9.81
 
 class quadProblem(quadDynamics6D):
 
-    def __init__(self, Q, R, Qf, u_ref, N, *args, **kwargs):
-        x0, xf = paper_setup_3_quads()
-
-        super.__init__(xf, Q, R, Qf, u_ref, N, *args, **kwargs)
+    def __init__(self, x0, xf, Q, R, Qf, u_ref, N, *args, **kwargs):
+    
+        super().__init__(xf, Q, R, Qf, u_ref, N, *args, **kwargs)
         
-        #control intervals
-        self.opti = quadDynamics6D.opti
-        self.X = quadDynamics6D.X
-        self.U = quadDynamics6D.U
-        self.T = quadDynamics6D.T
-     
+        
         #Setting objective function:
-        objective = quadDynamics6D.cost(xf, Q, R, Qf, u_ref)[0] + quadDynamics6D.cost(xf, Q, R, Qf, u_ref)[1]
+        objective = quadDynamics6D.cost(self)[0] + quadDynamics6D.cost(self)[1]
 
         #minimize objective:
         self.opti.minimize(objective)
 
-        #dynamic constraints:
-        g = 9.81
-        f = lambda x,u: vertcat(x[3],x[4],x[5],g*tan([0]),-g*tan(u[1]),u[2]-g) #dx/dt = f(x,u)
+        # #dynamic constraints:
+        # g = 9.81
+        # f = lambda x,u: vertcat(x[3],x[4],x[5],g*tan([0]),-g*tan(u[1]),u[2]-g) #dx/dt = f(x,u)
+        
+        f = self._f
 
         dt = self.T/N #length of a control interval
         
@@ -64,14 +60,21 @@ class quadProblem(quadDynamics6D):
         self.opti.subject_to(self.T>=0) #time must be positive
 
         #equality constraints:
-        self.opti.subject_to(self.X[0] == x0.T)
+        self.opti.subject_to(self.X[:,0] == x0)
         
         #initial values for solver
         self.opti.set_initial(self.T, 0)
 
-        
-
-        
+    @property
+    def ids(self):
+        if not isinstance(self.dynamics, MultiDynamicalModel):
+            raise NotImplementedError(
+                "Only MultiDynamicalModel's have an 'ids' attribute"
+            )
+        if not self.dynamics.ids == self.game_cost.ids:
+            raise ValueError(f"Dynamics and cost have inconsistent ID's: {self}")
+        return self.dynamics.ids.copy()
+    
     def solve(self):
         
         #self.mySolver = "ipopt"
@@ -82,7 +85,7 @@ class quadProblem(quadDynamics6D):
         self.opti.solver("ipopt")
         self.sol = self.opti.solve()
 
-        return self.sol
+        return self.sol.value(self.X),self.sol.value(self.U)
 
 
         
