@@ -11,7 +11,7 @@ class quadProblem:
     """Centralized MPC problem that combines all states and all costs"""
 
     def __init__(self, dynamics):
-        self.dynamics = dynamics #a list of dynamical models
+        self.dynamics = dynamics #Mluti-dynamical model
         
         
     @property
@@ -44,8 +44,7 @@ class quadProblem:
 
         # NOTE: Assume uniform dynamical models.
         ext_ind = self.ids.index(id_)
-        # x_dim = self.game_cost.x_dims[0]
-        # u_dim = self.game_cost.u_dims[0]
+
         x_dim = self.dynamics.x_dims[0]
         u_dim = self.dynamics.u_dims[0]
         Xi = X[:, ext_ind * x_dim : (ext_ind + 1) * x_dim]

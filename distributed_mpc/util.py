@@ -1,5 +1,6 @@
 import numpy as np
-
+import itertools
+from casadi import *
 
 def paper_setup_3_quads():
     x0 = np.array([[0.5, 1.5, 1, 0, 0, 0,
@@ -76,19 +77,19 @@ def define_inter_graph_threshold(X, radius, x_dims, ids):
     """
 
     planning_radii = 2 * radius
-    rel_dists = compute_pairwise_distance(X, x_dims) #this is a list
+    rel_dists = compute_pairwise_distance_Sym(X, x_dims) #this is a list
 
     N = X.shape[1]
     n_samples = 10
-    sample_step = max(N // n_samples, 1)
-    sample_slice = slice(0, N + 1, sample_step)
+    # sample_step = max(N // n_samples, 1)
+    # sample_slice = slice(0, N + 1, sample_step)
 
     # Put each pair of agents within each others' graphs if they are within
     # some threshold distance from each other.
     graph = {id_: [id_] for id_ in ids}
     pair_inds = np.array(list(itertools.combinations(ids, 2)))
     for i, pair in enumerate(pair_inds):
-        if np.any(rel_dists[sample_slice, i] < planning_radii):
+        if np.any(rel_dists[i] < planning_radii):
             graph[pair[0]].append(pair[1])
             graph[pair[1]].append(pair[0])
 
