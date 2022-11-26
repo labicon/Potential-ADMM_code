@@ -30,8 +30,6 @@ class SolveMPC:
         #TODO: determine subproblem and re-construct dynamics
         return vertcat(x[3],x[4],x[5],g*tan([0]),-g*tan(u[1]),u[2]-g) #dx/dt = f(x,u)
         
-     
-    
     def solve(dynamics):
         
         for k in range(self.N): #loop over control intervals
@@ -47,32 +45,32 @@ class SolveMPC:
             #inequality constraints(for a single quad):
             #TODO: generalize to n quadcopter dynamics
 
-            dynamics.opti.subject_to(dynamics.X[2,:]<=3.5) # altitude p_z is limited
-            dynamics.opti.subject_to(0.6<=dynamics.X[2,:])
+        dynamics.opti.subject_to(dynamics.X[2,:]<=3.5) # altitude p_z is limited
+        dynamics.opti.subject_to(0.6<=dynamics.X[2,:])
 
-            dynamics.opti.subject_to(dynamics.X[0,:]<=4) # p_x is limited
-            dynamics.opti.subject_to(-4<=dynamics.X[0,:])
+        dynamics.opti.subject_to(dynamics.X[0,:]<=4) # p_x is limited
+        dynamics.opti.subject_to(-4<=dynamics.X[0,:])
 
-            dynamics.opti.subject_to(dynamics.X[1,:]<=4) # p_y is limited
-            dynamics.opti.subject_to(-4<=dynamics.X[1,:])
+        dynamics.opti.subject_to(dynamics.X[1,:]<=4) # p_y is limited
+        dynamics.opti.subject_to(-4<=dynamics.X[1,:])
 
-            dynamics.opti.subject_to(dynamics.U[0,:]<=np.pi/6) # theta is limited
-            dynamics.opti.subject_to(-np.pi/6<=dynamics.U[0,:])
+        dynamics.opti.subject_to(dynamics.U[0,:]<=np.pi/6) # theta is limited
+        dynamics.opti.subject_to(-np.pi/6<=dynamics.U[0,:])
 
-            dynamics.opti.subject_to(dynamics.U[1,:]<=np.pi/6) # phi is limited
-            dynamics.opti.subject_to(-np.pi/6<=dynamics.U[1,:])
+        dynamics.opti.subject_to(dynamics.U[1,:]<=np.pi/6) # phi is limited
+        dynamics.opti.subject_to(-np.pi/6<=dynamics.U[1,:])
 
-            dynamics.opti.subject_to(dynamics.U[2,:]<=20) # tau is limited
-            dynamics.opti.subject_to(0<=dynamics.U[2,:])
+        dynamics.opti.subject_to(dynamics.U[2,:]<=20) # tau is limited
+        dynamics.opti.subject_to(0<=dynamics.U[2,:])
 
-            dynamics.opti.subject_to(dynamics.T>=0) #time must be positive
+        dynamics.opti.subject_to(dynamics.T>=0) #time must be positive
 
-            #equality constraints:
-            dynamics.opti.subject_to(dynamics.X[:,0] == x0)
+        #equality constraints:
+        dynamics.opti.subject_to(dynamics.X[:,0] == x0)
 
-            #initial values for solver
-            dynamics.opti.set_initial(dynamics.T, 0)
-        
+        #initial values for solver
+        dynamics.opti.set_initial(dynamics.T, 0)
+
         dynamics.opti.solver("ipopt")
         dynamics.sol = dynamics.opti.solve()
 
