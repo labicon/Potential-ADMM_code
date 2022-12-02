@@ -1,6 +1,10 @@
 import numpy as np
 import itertools
 from casadi import *
+import casadi as cs
+
+eps = 1e-3
+
 
 def paper_setup_3_quads():
     x0 = np.array([[0.5, 1.5, 1, 0, 0, 0,
@@ -43,20 +47,25 @@ def split_graph(Z, z_dims, graph):
         )
 
     return z_split
-eps = 1e-3
+
+
 def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
     """Compute the distance between each pair of agents"""
     assert len(set(x_dims)) == 1
-
+    # print(X, type(X))
     n_agents = len(x_dims)
     n_states = x_dims[0]
+    n_d = 3
 
     if n_agents == 1:
         raise ValueError("Can't compute pairwise distance for one agent.")  
     
     pair_inds = np.array(list(itertools.combinations(range(n_agents), 2)))
+    X_agent = X.reshape((n_agents, n_states))
+    dX = X_agent[pair_inds[:,0], :n_d] - X_agent[pair_inds[:,1], :n_d]
+    dist1 = cs.sqrt(cs.sum2(dX**2))
+    # return cs.norm_2(dX)
     
-    X_agent = reshape(X,(n_agents, n_states))
     distances = []
     
     if n_agents == 2:
@@ -68,7 +77,7 @@ def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
         for j in range(dX.shape[1]):
             distances.append(sqrt(dX[0,j]**2+dX[1,j]**2+dX[2,j]**2 + eps))
             
-    return distances #this is a list of symbolic pariwise distances
+    return distances, dist1 #this is a list of symbolic pariwise distances
 
 
 def define_inter_graph_threshold(X, radius, x_dims, ids):
@@ -77,8 +86,10 @@ def define_inter_graph_threshold(X, radius, x_dims, ids):
     """
 
     planning_radii = 2 * radius
-    rel_dists = compute_pairwise_distance_Sym(X, x_dims) #this is a list
-
+    # TODO: deterministic, not symbolic.
+    rel_dists, dtest = compute_pairwise_distance_Sym(X, x_dims) #this is a list
+    print(rel_dists, dtest)
+    
     N = X.shape[1]
     n_samples = 10
     # sample_step = max(N // n_samples, 1)
