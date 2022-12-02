@@ -6,6 +6,12 @@ import casadi as cs
 eps = 1e-3
 
 
+def distance_to_goal(x,xf,n_agents,n_states):
+    n_d = 3 
+    return np.linalg.norm((x - xf).reshape(n_agents, n_states)[:, :n_d], axis=1)
+
+
+
 def paper_setup_3_quads():
     x0 = np.array([[0.5, 1.5, 1, 0, 0, 0,
                     2.5, 1.5, 1, 0, 0, 0,
@@ -47,6 +53,33 @@ def split_graph(Z, z_dims, graph):
         )
 
     return z_split
+
+def define_inter_graph_threshold(X, radius, x_dims, ids):
+    """Compute the interaction graph based on a simple thresholded distance
+    for each pair of agents sampled over the trajectory
+    """
+
+    planning_radii = 2 * radius
+    rel_dists = compute_pairwise_distance(X, x_dims)
+
+    # N = X.shape[0]
+    # n_samples = 10
+    # sample_step = max(N // n_samples, 1)
+    # sample_slice = slice(0, N + 1, sample_step)
+
+    # Put each pair of agents within each others' graphs if they are within
+    # some threshold distance from each other.
+    graph = {id_: [id_] for id_ in ids}
+    # print(graph)
+    pair_inds = np.array(list(itertools.combinations(ids, 2)))
+    for i, pair in enumerate(pair_inds):
+        if np.any(rel_dists[:,i] < planning_radii):
+            graph[pair[0]].append(pair[1])
+            graph[pair[1]].append(pair[0])
+
+    graph = {agent_id: sorted(prob_ids) for agent_id, prob_ids in graph.items()}
+    return graph
+
 
 
 # def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
@@ -107,29 +140,18 @@ def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
     return distances #this is a list of symbolic pariwise distances
 
 
-def define_inter_graph_threshold(X, radius, x_dims, ids):
-    """Compute the interaction graph based on a simple thresholded distance
-    for each pair of agents sampled over the trajectory
-    """
 
-    planning_radii = 2 * radius
-    # TODO: deterministic, not symbolic.
-    rel_dists, dtest = compute_pairwise_distance_Sym(X, x_dims) #this is a list
-    print(rel_dists, dtest)
-    
-    N = X.shape[1]
-    n_samples = 10
-    # sample_step = max(N // n_samples, 1)
-    # sample_slice = slice(0, N + 1, sample_step)
+def compute_pairwise_distance(X, x_dims, n_d=2):
+    """Compute the distance between each pair of agents"""
+    assert len(set(x_dims)) == 1
 
-    # Put each pair of agents within each others' graphs if they are within
-    # some threshold distance from each other.
-    graph = {id_: [id_] for id_ in ids}
-    pair_inds = np.array(list(itertools.combinations(ids, 2)))
-    for i, pair in enumerate(pair_inds):
-        if np.any(rel_dists[i] < planning_radii):
-            graph[pair[0]].append(pair[1])
-            graph[pair[1]].append(pair[0])
+    n_agents = len(x_dims)
+    n_states = x_dims[0]
 
-    graph = {agent_id: sorted(prob_ids) for agent_id, prob_ids in graph.items()}
-    return graph
+    if n_agents == 1:
+        raise ValueError("Can't compute pairwise distance for one agent.")
+
+    pair_inds = np.array(list(itertools.combinations(range(n_agents), 2)))
+    X_agent = X.reshape(-1, n_agents, n_states).swapaxes(0, 2)
+    dX = X_agent[:n_d, pair_inds[:, 0]] - X_agent[:n_d, pair_inds[:, 1]]
+    return np.linalg.norm(dX, axis=0).T
