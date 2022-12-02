@@ -61,7 +61,7 @@ def define_inter_graph_threshold(X, radius, x_dims, ids):
 
     planning_radii = 2 * radius
     rel_dists = compute_pairwise_distance(X, x_dims)
-
+    print(f'determining interaction graph with the following pair-wise distance : {rel_dists}')
     # N = X.shape[0]
     # n_samples = 10
     # sample_step = max(N // n_samples, 1)
