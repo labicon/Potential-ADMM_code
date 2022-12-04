@@ -131,11 +131,20 @@ def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
     if n_agents == 2:
         dX=X_agent[0,0:3]-X_agent[1,0:3]
         distances.append(sqrt(dX[0]**2+dX[1]**2+dX[2]**2 + eps))
+    
+    if n_agents > 2 and n_agents <=5:
         
-    else:
         dX = X_agent[:n_d, pair_inds[:, 0]] - X_agent[:n_d, pair_inds[:, 1]]
         for j in range(dX.shape[1]):
             distances.append(sqrt(dX[0,j]**2+dX[1,j]**2+dX[2,j]**2 + eps))
+        
+        
+    if n_agents > 5:
+    
+        dX = X_agent.T[:n_d, pair_inds[:, 0]] - X_agent.T[:n_d, pair_inds[:, 1]]
+        for j in range(dX.shape[1]):
+            distances.append(sqrt(dX[0,j]**2+dX[1,j]**2+dX[2,j]**2 + eps))
+
             
     return distances #this is a list of symbolic pariwise distances
 
