@@ -81,38 +81,6 @@ def define_inter_graph_threshold(X, radius, x_dims, ids):
     return graph
 
 
-
-# def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
-#     """Compute the distance between each pair of agents"""
-#     assert len(set(x_dims)) == 1
-#     # print(X, type(X))
-#     n_agents = len(x_dims)
-#     n_states = x_dims[0]
-#     n_d = 3
-
-#     if n_agents == 1:
-#         raise ValueError("Can't compute pairwise distance for one agent.")  
-    
-#     pair_inds = np.array(list(itertools.combinations(range(n_agents), 2)))
-#     X_agent = X.reshape((n_agents, n_states))
-#     dX = X_agent[pair_inds[:,0], :n_d] - X_agent[pair_inds[:,1], :n_d]
-#     dist1 = cs.sqrt(cs.sum2(dX**2))
-#     # return cs.norm_2(dX)
-    
-#     distances = []
-    
-#     if n_agents == 2:
-#         dX=X_agent[0,0:3]-X_agent[1,0:3]
-#         distances.append(sqrt(dX[0]**2+dX[1]**2+dX[2]**2 + eps))
-        
-#     else:
-#         dX = X_agent[:n_d, pair_inds[:, 0]] - X_agent[:n_d, pair_inds[:, 1]]
-#         for j in range(dX.shape[1]):
-#             distances.append(sqrt(dX[0,j]**2+dX[1,j]**2+dX[2,j]**2 + eps))
-            
-#     return distances, dist1 #this is a list of symbolic pariwise distances
-
-
 def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
     """Compute the distance between each pair of agents"""
     assert len(set(x_dims)) == 1
