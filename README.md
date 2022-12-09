@@ -1,4 +1,4 @@
-# A potential-game approach to distributed trajectory optimization using MPC and SCP
+# A potential-game approach to distributed trajectory optimization using nonlinear MPC and sequential convex programming
 
 ## How to use
 This repository is based on the [Casadi](https://web.casadi.org/) pacakge. The goal is to achieve efficient online trajectory optimization leveraging both distributed MPC and distributed sequential convex programming. 
