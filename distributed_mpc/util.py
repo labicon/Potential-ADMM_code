@@ -13,8 +13,8 @@ def paper_setup_3_quads():
     xf = np.array([[2.5, 1.5, 1, 0, 0, 0, 
                     0.5, 1.5, 1, 0, 0, 0, 
                     1.5, 2.2, 1, 0, 0, 0]]).T
-    # x0[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
-    # xf[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
+    x0[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
+    xf[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
     return x0, xf
 
 def paper_setup_5_quads():
@@ -27,6 +27,9 @@ def paper_setup_5_quads():
          2.998,  0.   ,  0.   ,  0.   , -1.452, -0.02 , -1.11 ,  0.   ,
          0.   ,  0.   ,  0.34 , -0.993, -0.832,  0.   ,  0.   ,  0.   ,
          1.094,  0.237,  0.137,  0.   ,  0.   ,  0.   ]]).T
+    
+    x0[dec.pos_mask([6]*5, 3)] += 0.01*np.random.randn(15, 1)
+    xf[dec.pos_mask([6]*5, 3)] += 0.01*np.random.randn(15, 1)
     
     return x0,xf
     
@@ -49,6 +52,9 @@ def paper_setup_10_quads():
          0.   ,  0.   , -1.26 , -0.697,  2.494,  0.   ,  0.   ,  0.   ,
         -0.213, -0.138,  1.545,  0.   ,  0.   ,  0.   , -0.582, -0.663,
          2.518,  0.   ,  0.   ,  0.   ]]).T
+    
+    x0[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
+    xf[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
     
     return x0,xf
 

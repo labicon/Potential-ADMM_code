@@ -6,7 +6,7 @@ from centralized_mpc import solve_rhc
 from distributed_mpc import solve_rhc_distributed
 
 """ 
-Define constants:
+Define simulation parameters
 
 """
 
@@ -44,11 +44,6 @@ n_inputs = 3
 centralized = True
 
 
-
-
-
-
-
 if __name__ == "__main__" :
     
     print("Choose the number of agents (3,5,or 10):")
@@ -58,8 +53,7 @@ if __name__ == "__main__" :
     flag = input()
     if flag == 'distributed':
         centralized = False
-        
-        
+
     if n_agents == 3:
         x0,xf = paper_setup_3_quads()
         u_ref = np.array([0,0,g,0,0,g,0,0,g])
@@ -101,14 +95,16 @@ if __name__ == "__main__" :
         
     if centralized:
         file_name = 'centralized_sim_data'
-        X_full, U_full, t = solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
+        X_full, U_full, t, J_f = solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
                                      max_input,min_input,max_state,min_state)
-        
+  
     if not centralized:
         file_name = 'distributed_sim_data'
         ids =  [100 + i for i in range(n_agents)]
-        X_full, U_full, t = solve_rhc_distributed(
-                                        x0, xf, u_ref, N, Q, R, Qf, n_agents, n_states, n_inputs, radius, ids
-                                    )
+        X_full, U_full, t, J_f = solve_rhc_distributed(
+                                        x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
+                                        x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
+                                          theta_min,tau_max,tau_min,phi_max,phi_min
+                                            )
         
     np.save(file_name, X_full,U_full,t)

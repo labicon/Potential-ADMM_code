@@ -134,19 +134,16 @@ def solve_rhc_distributed(
 
             min_states, max_states = state_boundsi
             min_inputs, max_inputs = input_boundsi
-
-            di.minimize(costi)
-
-            n_states_local = statesi.shape[
-                0
-            ]  # each subproblem has different number of states
+            
+            n_states_local = statesi.shape[0]  # each subproblem has different number of states
             # print(f'n_states_local:{n_states_local}')
             n_inputs_local = inputsi.shape[0]
             x_dims_local = [int(n_states)] * int(n_states_local / n_states)
 
+            cost_coll = (compute_pairwise_distance(statesi[:, k], x_dims_local)-radius)**2*500
+            di.minimize(costi + cost_coll)
+            
             print(f"current sub-problem has state dimension : {x_dims_local}")
-            # u_dims_local =  [int(n_inputs_local/(n_inputs_local/n_inputs))]*int(n_inputs_local/n_inputs)
-            # i.e, [6,6] if the current sub-problem has 2 agents combined, or [6,6,6] if 3 agents are combined
 
             f = generate_f(x_dims_local)
 

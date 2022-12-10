@@ -8,7 +8,7 @@ from util import (
     compute_pairwise_distance_Sym,
     define_inter_graph_threshold,
     distance_to_goal,
-    split_graph,
+    split_graph, 
     generate_f,
     objective,
     generate_min_max_input,
@@ -43,7 +43,7 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     J_list.append(np.inf)
     # for i in range(M) :
     i = 0
-    dt = 0.05
+    dt = 0.1
     
     while np.any(distance_to_goal(x0,xf,n_agents,n_states) > 0.1)  and (i < M):
         
@@ -117,5 +117,5 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
             break
             
         
-    return X_full,U_full, t
+    return X_full,U_full, t, J_list[-1]
 
