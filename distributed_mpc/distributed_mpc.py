@@ -1,7 +1,7 @@
 import casadi as cs
 import numpy as np
 from scipy.constants import g
-
+from casadi import *
 from util import *
 # from util import (
 #     compute_pairwise_distance,
@@ -11,36 +11,8 @@ from util import *
 #     split_graph,
 # )
 
-
-theta_max = np.pi / 6
-phi_max = np.pi / 6
-
-v_max = 3
-v_min = -3
-
-theta_min = -np.pi / 6
-phi_min = -np.pi / 6
-
-tau_max = 15
-tau_min = 0
-
-x_min = -5
-x_max = 5
-
-y_min = -5
-y_max = 5
-
-z_min = 0
-z_max = 3.0
-
-max_input_base = np.array([[theta_max], [phi_max], [tau_max]])
-min_input_base = np.array([[theta_min], [phi_min], [tau_min]])
-max_state_base = np.array([[x_max], [y_max], [z_max], [v_max],[v_max], [v_max]])
-min_state_base = np.array([[x_min], [y_min], [z_min], [v_min],[v_min], [v_min]])
-
-
 def solve_rhc_distributed(
-    x0, xf, u_ref, N, Q, R, Qf, n_agents, n_states, n_inputs, radius, ids
+    x0, xf, u_ref, N, Q, R, Qf, n_agents, n_states, n_inputs, radius, ids,
 ):
 
     x_dims = [n_states] * n_agents

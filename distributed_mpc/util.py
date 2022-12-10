@@ -184,7 +184,7 @@ def define_inter_graph_threshold(X, radius, x_dims, ids):
 def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
     """Compute the distance between each pair of agents"""
     assert len(set(x_dims)) == 1
-
+    eps = 1e-3
     n_agents = len(x_dims)
     n_states = x_dims[0]
 

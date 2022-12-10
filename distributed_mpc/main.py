@@ -1,15 +1,14 @@
 import casadi as cs
 import numpy as np
 from scipy.constants import g
+from util import *
+from centralized_mpc import solve_rhc
+from distributed_mpc import solve_rhc_distributed
 
+""" 
+Define constants:
 
-from util import (
-    compute_pairwise_distance,
-    compute_pairwise_distance_Sym,
-    define_inter_graph_threshold,
-    distance_to_goal,
-    split_graph,
-)
+"""
 
 theta_max = np.pi / 6
 phi_max = np.pi / 6
@@ -37,88 +36,79 @@ min_input_base = np.array([[theta_min], [phi_min], [tau_min]])
 max_state_base = np.array([[x_max], [y_max], [z_max], [v_max],[v_max], [v_max]])
 min_state_base = np.array([[x_min], [y_min], [z_min], [v_min],[v_min], [v_min]])
 
-def generate_f(x_dims_local):
+radius = 0.5
+N = 15
+n_states = 6
+n_inputs = 3
+
+centralized = True
+
+
+
+
+
+
+
+if __name__ == "__main__" :
     
-    # NOTE: Assume homogeneity of agents.
-    n_agents = len(x_dims_local)
-    n_states = x_dims_local[0]
-    n_controls = 3
+    print("Choose the number of agents (3,5,or 10):")
+    n_agents = int(input())
     
-    def f(x, u):
-        x_dot = cs.MX.zeros(x.numel())
-        for i_agent in range(n_agents):
-            i_xstart = i_agent * n_states
-            i_ustart = i_agent * n_controls
-            x_dot[i_xstart:i_xstart + n_states] = cs.vertcat(
-                x[i_xstart + 3: i_xstart + 6],
-                g*cs.tan(u[i_ustart]), -g*cs.tan(u[i_ustart+1]), u[i_ustart+2] - g
-                )
-            
-        return x_dot
-    
-    return f
+    print("Choose the distributed or centralized:")
+    flag = input()
+    if flag == 'distributed':
+        centralized = False
+        
+        
+    if n_agents == 3:
+        x0,xf = paper_setup_3_quads()
+        u_ref = np.array([0,0,g,0,0,g,0,0,g])
+        Q = np.diag([5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1])
+        R = np.eye(n_agents*n_inputs)*0.01
+        Qf = np.eye(n_agents*n_states)*1000
+        max_input = np.tile(max_input_base,n_agents)
+        min_input = np.tile(min_input_base,n_agents)
+        max_state = np.tile(max_state_base,n_agents)
+        min_state = np.tile(min_state_base,n_agents)
+        
+        
+    elif n_agents == 5:
+        x0,xf = paper_setup_5_quads()
+        u_ref = np.array([0,0,g,0,0,g,0,0,g,0,0,g,0,0,g])
+        Q = np.diag([5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1,\
+                     5,5,5,1,1,1,5,5,5,1,1,1])
+        R = np.eye(n_agents*n_inputs)*0.01
+        Qf = np.eye(n_agents*n_states)*1000
+        max_input = np.tile(max_input_base,n_agents)
+        min_input = np.tile(min_input_base,n_agents)
+        max_state = np.tile(max_state_base,n_agents)
+        min_state = np.tile(min_state_base,n_agents)
 
-
-def objective(X, U, u_ref, xf, Q, R, Qf):
-    total_stage_cost = 0
-    for j in range(X.shape[1] - 1):
-        for i in range(X.shape[0]):
-            total_stage_cost += (X[i, j] - xf[i]) * Q[i, i] * (X[i, j] - xf[i])
-
-    for j in range(U.shape[1]):
-        for i in range(U.shape[0]):
-            total_stage_cost += (U[i, j] - u_ref[i]) * R[i, i] * (U[i, j] - u_ref[i])
-
-    # Quadratic terminal cost:
-    total_terminal_cost = 0
-
-    for i in range(X.shape[0]):
-        total_terminal_cost += (X[i, -1] - xf[i]) * Qf[i, i] * (X[i, -1] - xf[i])
-
-    return total_stage_cost + total_terminal_cost
-
-
-def generate_min_max_input(inputs_dict, n_inputs):
-
-    theta_max = np.pi / 6
-    phi_max = np.pi / 6
-
-    # v_max = 3
-    # v_min = -3
-
-    theta_min = -np.pi / 6
-    phi_min = -np.pi / 6
-
-    tau_max = 15
-    tau_min = 0
-
-    n_agents = [u.shape[0] // n_inputs for u in inputs_dict.values()]
-
-    u_min = np.array([[theta_min, phi_min, tau_min]])
-    u_max = np.array([[theta_max, phi_max, tau_max]])
-
-    return [
-        (np.tile(u_min, n_agents_i), np.tile(u_max, n_agents_i))
-        for n_agents_i in n_agents
-    ]
-
-
-def generate_min_max_state(states_dict, n_states):
-
-    x_min = -5
-    x_max = 5
-
-    y_min = -5
-    y_max = 5
-
-    z_min = 0
-    z_max = 3.0
-
-    n_agents = [x.shape[0] // n_states for x in states_dict.values()]
-    x_min = np.array([[x_min, y_min, z_min, v_min, v_min, v_min]])
-    x_max = np.array([[x_max, y_max, z_max, v_max, v_max, v_max]])
-
-    return [
-        (np.tile(x_min, n_agents_i), np.tile(x_max, n_agents_i))
-        for n_agents_i in n_agents
-    ]
+    elif n_agents == 10:
+        x0,xf = paper_setup_10_quads()
+        radius = 0.2
+        u_ref = np.array([0,0,g,0,0,g,0,0,g,0,0,g,0,0,g,
+                         0,0,g,0,0,g,0,0,g,0,0,g,0,0,g])
+        Q = np.diag([5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1,\
+                     5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1,\
+                    5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1])
+        R = np.eye(n_agents*n_inputs)*0.01
+        Qf = np.eye(n_agents*n_states)*1000
+        max_input = np.tile(max_input_base,n_agents)
+        min_input = np.tile(min_input_base,n_agents)
+        max_state = np.tile(max_state_base,n_agents)
+        min_state = np.tile(min_state_base,n_agents)
+        
+    if centralized:
+        file_name = 'centralized_sim_data'
+        X_full, U_full, t = solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
+                                     max_input,min_input,max_state,min_state)
+        
+    if not centralized:
+        file_name = 'distributed_sim_data'
+        ids =  [100 + i for i in range(n_agents)]
+        X_full, U_full, t = solve_rhc_distributed(
+                                        x0, xf, u_ref, N, Q, R, Qf, n_agents, n_states, n_inputs, radius, ids
+                                    )
+        
+    np.save(file_name, X_full,U_full,t)
