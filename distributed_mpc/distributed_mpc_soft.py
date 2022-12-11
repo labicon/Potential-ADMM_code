@@ -4,7 +4,13 @@ from scipy.constants import g
 from casadi import *
 from util import *
 
-def solve_rhc_distributed(
+
+def sigmoid_cost(x):
+    
+    return 10/(1-cs.exp(-0.5*x))
+    
+
+def solve_rhc_distributed_soft(
     x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
     x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
   theta_min,tau_max,tau_min,phi_max,phi_min
@@ -140,13 +146,10 @@ def solve_rhc_distributed(
             n_inputs_local = inputsi.shape[0]
             x_dims_local = [int(n_states)] * int(n_states_local / n_states)
 
-            cost_coll = (compute_pairwise_distance(statesi[:, k], x_dims_local)-radius)**2*500
-            di.minimize(costi + cost_coll)
-            
             print(f"current sub-problem has state dimension : {x_dims_local}")
 
             f = generate_f(x_dims_local)
-
+            cost_coll = []
             for k in range(N):  # loop over control intervals
                 # Runge-Kutta 4 integration
 
@@ -155,30 +158,26 @@ def solve_rhc_distributed(
                 k3 = f(statesi[:, k] + dt / 2 * k2, inputsi[:, k])
                 k4 = f(statesi[:, k] + dt * k3, inputsi[:, k])
                 x_next = statesi[:, k] + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
-
+                
                 di.subject_to(statesi[:, k + 1] == x_next)  # close the gaps
 
                 di.subject_to(inputsi[:, k] <= max_inputs.T)
                 di.subject_to(min_inputs.T <= inputsi[:, k])
-
+            
+            
+            
             for k in range(N + 1):
-
+                if len(x_dims_local) >1:
+                    #Sigmoid function for the collision avoidance costs
+                    cost_coll.append(sum(sigmoid_cost(q) for q in compute_pairwise_distance_Sym(statesi[:, k], x_dims_local)))
                 di.subject_to(statesi[:, k] <= max_states.T)
                 di.subject_to(min_states.T <= statesi[:, k])
-
-                # DBG
-                # distances, d_test = compute_pairwise_distance_Sym(statesi[:,k], x_dims_local)
-                # print(distances, d_test)
-
-                # collision avoidance over control horizon (only if the current sub-problem contains the states of more than 1 agent):
-
-                if len(x_dims_local) != 1:
-                    distances = compute_pairwise_distance_Sym(
-                        statesi[:, k], x_dims_local
-                    )
-                    for n in distances:
-                        di.subject_to(n >= radius)
-
+            
+            if len(x_dims_local)> 1:
+                di.minimize(costi + sum(cost_coll)*50)
+            if len(x_dims_local) == 1:
+                di.minimize(costi)
+            
             # equality constraints for initial condition:
             di.subject_to(
                 statesi[:, 0] == split_problem_states_initial[count].reshape(-1, 1)

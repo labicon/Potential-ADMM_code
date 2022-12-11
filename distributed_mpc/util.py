@@ -5,7 +5,8 @@ import casadi as cs
 import decentralized as dec
 
 
-def paper_setup_3_quads():
+def paper_setup_3_quads(random = False):
+    
     x0 = np.array([[0.5, 1.5, 1, 0, 0, 0,
                     2.5, 1.5, 1, 0, 0, 0,
                     1.5, 1.3, 1, 0, 0, 0]], 
@@ -13,11 +14,12 @@ def paper_setup_3_quads():
     xf = np.array([[2.5, 1.5, 1, 0, 0, 0, 
                     0.5, 1.5, 1, 0, 0, 0, 
                     1.5, 2.2, 1, 0, 0, 0]]).T
-    x0[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
-    xf[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
+    if random == True:
+        x0[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
+        xf[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
     return x0, xf
 
-def paper_setup_5_quads():
+def paper_setup_5_quads(random = False):
     x0 = np.array([[-0.182, -0.545,  1.161,  0.   ,  0.   ,  0.   ,  1.335,  1.484,
          0.5  ,  0.   ,  0.   ,  0.   , -0.97 , -0.831,  2.295,  0.   ,
          0.   ,  0.   , -1.144, -1.193,  1.7  ,  0.   ,  0.   ,  0.   ,
@@ -27,14 +29,14 @@ def paper_setup_5_quads():
          2.998,  0.   ,  0.   ,  0.   , -1.452, -0.02 , -1.11 ,  0.   ,
          0.   ,  0.   ,  0.34 , -0.993, -0.832,  0.   ,  0.   ,  0.   ,
          1.094,  0.237,  0.137,  0.   ,  0.   ,  0.   ]]).T
-    
-    x0[dec.pos_mask([6]*5, 3)] += 0.01*np.random.randn(15, 1)
-    xf[dec.pos_mask([6]*5, 3)] += 0.01*np.random.randn(15, 1)
+    if random == True:
+        x0[dec.pos_mask([6]*5, 3)] += 0.01*np.random.randn(15, 1)
+        xf[dec.pos_mask([6]*5, 3)] += 0.01*np.random.randn(15, 1)
     
     return x0,xf
     
     
-def paper_setup_10_quads():
+def paper_setup_10_quads(random = False):
     
     x0 = np.array([[ 0.357,  0.799,  1.504,  0.   ,  0.   ,  0.   ,  2.172,  2.283,
          1.436,  0.   ,  0.   ,  0.   , -0.085,  0.577,  2.433,  0.   ,
@@ -53,9 +55,11 @@ def paper_setup_10_quads():
         -0.213, -0.138,  1.545,  0.   ,  0.   ,  0.   , -0.582, -0.663,
          2.518,  0.   ,  0.   ,  0.   ]]).T
     
-    x0[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
-    xf[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
-    
+    if random == True:
+        
+        x0[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
+        xf[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
+
     return x0,xf
 
 def generate_f(x_dims_local):

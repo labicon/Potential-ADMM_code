@@ -4,7 +4,7 @@ from scipy.constants import g
 from util import *
 from centralized_mpc import solve_rhc
 from distributed_mpc import solve_rhc_distributed
-
+from distributed_mpc_soft import solve_rhc_distributed_soft
 """ 
 Define simulation parameters
 
@@ -42,7 +42,7 @@ n_states = 6
 n_inputs = 3
 
 centralized = True
-
+soft_constraint = True
 
 if __name__ == "__main__" :
     
@@ -80,7 +80,7 @@ if __name__ == "__main__" :
 
     elif n_agents == 10:
         x0,xf = paper_setup_10_quads()
-        radius = 0.2
+        radius = 0.35
         u_ref = np.array([0,0,g,0,0,g,0,0,g,0,0,g,0,0,g,
                          0,0,g,0,0,g,0,0,g,0,0,g,0,0,g])
         Q = np.diag([5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1,\
@@ -94,17 +94,26 @@ if __name__ == "__main__" :
         min_state = np.tile(min_state_base,n_agents)
         
     if centralized:
-        file_name = 'centralized_sim_data'
+        file_name = f'{n_agents}_drones_centralized_sim_data'
         X_full, U_full, t, J_f = solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
                                      max_input,min_input,max_state,min_state)
   
     if not centralized:
-        file_name = 'distributed_sim_data'
-        ids =  [100 + i for i in range(n_agents)]
-        X_full, U_full, t, J_f = solve_rhc_distributed(
-                                        x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
-                                        x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
-                                          theta_min,tau_max,tau_min,phi_max,phi_min
-                                            )
-        
+        if soft_constraint == True:
+            file_name = f'{n_agents}_drones_distributed_sim_data(soft_constraint)'
+            ids =  [100 + i for i in range(n_agents)]
+            X_full, U_full, t, J_f = solve_rhc_distributed_soft(
+                                            x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
+                                            x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
+                                              theta_min,tau_max,tau_min,phi_max,phi_min
+                                                )
+        else:
+            file_name = f'{n_agents}_drones_distributed_sim_data'
+            ids =  [100 + i for i in range(n_agents)]
+            X_full, U_full, t, J_f = solve_rhc_distributed(
+                                            x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
+                                            x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
+                                              theta_min,tau_max,tau_min,phi_max,phi_min
+                                                )
+            
     np.save(file_name, X_full,U_full,t)
