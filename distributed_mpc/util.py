@@ -283,7 +283,7 @@ def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
 
 def compute_pairwise_distance_nd_Sym(X, x_dims, n_dims):
     """Analog to the above whenever some agents only use distance in the x-y plane"""
-    CYLINDER_RADIUS = 0.2
+    CYLINDER_RADIUS = 0.3
 
     n_states = x_dims[0]
     n_agents = len(x_dims)
@@ -303,7 +303,7 @@ def compute_pairwise_distance_nd_Sym(X, x_dims, n_dims):
             else:
                 diff = dX[0,:]**2+dX[1,:]**2
 
-            distances.append(sqrt(dist + eps)-CYLINDER_RADIUS)
+            distances.append(sqrt(dist + eps)+CYLINDER_RADIUS)
     
     return distances
 
