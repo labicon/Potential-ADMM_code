@@ -3,6 +3,8 @@ import numpy as np
 from scipy.constants import g
 from casadi import *
 from util import *
+import logging
+
 
 
 def sigmoid_cost(x):
@@ -15,7 +17,9 @@ def solve_rhc_distributed_soft(
     x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
   theta_min,tau_max,tau_min,phi_max,phi_min
 ):
-
+    
+    
+    
     x_dims = [n_states] * n_agents
     u_dims = [n_inputs] * n_agents
 
@@ -36,7 +40,8 @@ def solve_rhc_distributed_soft(
 
     X_full = np.zeros((0, n_x))
     U_full = np.zeros((0, n_u))
-
+    
+    converged = False
     while np.any(distance_to_goal(x0, xf, n_agents, n_states) > 0.1) and (loop < M):
 
         ######################################################################
@@ -228,10 +233,17 @@ def solve_rhc_distributed_soft(
 
         t += dt
         loop += 1
-
+        
+        
         if abs(J_list[loop] - J_list[loop - 1]) <= 1:
             print(f"Terminated! at loop = {loop}")
             break
+        
+        logging.info(
+            f'{n_agents},{N},'
+            f'{t},{objective_val},{dt},"{ids}",'
+            f'"{converged}"'
+        )
 
-
+        
     return X_full, U_full, t, J_list[-1]

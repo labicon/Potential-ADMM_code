@@ -16,11 +16,13 @@ import logging
 from pathlib import Path
 import multiprocessing as mp
 from os import getpid
+import os
 from time import strftime
 
 import numpy as np
 
 from util import *
+import util
 from decentralized import random_setup
 from distributed_mpc import *
 from centralized_mpc import *
@@ -45,7 +47,7 @@ y_min = -5
 y_max = 5
 
 z_min = 0
-z_max = 3.0
+z_max = 3.5
 
 u_ref_base = np.array([0,0,g])
 
@@ -60,96 +62,129 @@ n_states = 6
 n_inputs = 3
 
 
-def multi_agent_run(n_agents,dt, N, radius, energy=15):
+def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
     """Single simulation comparing the centralized and decentralized solvers"""
     
     if n_agents == 3:
-        x0,xf = paper_setup_3_quads()
+        x0,xf = util.paper_setup_3_quads(True)
         
     elif n_agents == 5:
-        x0,xf = paper_setup_5_quads()
+        x0,xf = util.paper_setup_5_quads(True)
         
     elif n_agents == 10:
-        x0,xf = paper_setup_10_quads()
+        x0,xf = util.paper_setup_10_quads(True)
+        
+    elif n_agents == 15:
+        x0,xf = util.paper_setup_15_quads()
+        
+    elif n_agents == 20:
+        x0,xf = util.paper_setup_20_quads()
+        
     
     ids = [100 + i for i in range(n_agents)]
     
     Q = np.eye(n_states*n_agents) * 100
-    R = np.eye(n_inputs*n_agents)*0.01
+    R = np.eye(n_inputs*n_agents) * 0.01
 
     Qf = 1000.0 * np.eye(Q.shape[0])
-
-   
-    # Solve the problem centralized.
-    print("\t\t\tcentralized")
+    
+    
     max_input = np.tile(max_input_base,n_agents)
     min_input = np.tile(min_input_base,n_agents)
     max_state = np.tile(max_state_base,n_agents)
     min_state = np.tile(min_state_base,n_agents)
+
     u_ref = np.tile(u_ref_base,n_agents)
-    Xc, Uc, tc , J_fc= solve_rhc(x0,xf,u_ref,
-                           N,Q,R,Qf,n_agents,
-                           n_states,n_inputs,
-                           radius,max_input,
-                           min_input,max_state,
-                           min_state)
+   
+    # Solve the problem centralized.
+    if centralized == True:
+        print("\t\t\tcentralized")
+        
 
-    # Solve the problem decentralized.
-    print("\t\t\tdistributed")
+        Xc, Uc, tc , J_c, failed_count, converged = solve_rhc(trial,x0,xf,u_ref,
+                               N,Q,R,Qf,n_agents,
+                               n_states,n_inputs,
+                               radius,max_input,
+                               min_input,max_state,
+                               min_state)
 
-    Xd, Ud, td, J_fd = solve_rhc_distributed(
-            x0, xf, u_ref, N,  
-            n_agents, n_states, n_inputs, radius, ids,
-            x_min,x_max,y_min,y_max,z_min,z_max,v_min,
-            v_max,theta_max,
-            theta_min,tau_max,
-            tau_min,phi_max,phi_min
-                            )
+        
+    else:
+        print("\t\t\tdistributed")
 
+        Xd, Ud, td, J_d , failed_count, converged = solve_rhc_distributed(
+                trial,x0, xf, u_ref, N,  
+                n_agents, n_states, n_inputs, radius, ids,
+                x_min,x_max,y_min,y_max,z_min,z_max,v_min,
+                v_max,theta_max,
+                theta_min,tau_max,
+                tau_min,phi_max,phi_min
+                                )
 
-def setup_logger():
+def setup_logger(centralized=False):
     
-    LOG_PATH = Path(__file__).parent.parent / "logs"
-    LOG_FILE = LOG_PATH / strftime(
-        "dec-mc-_%m-%d-%y_%H.%M.%S_{getpid()}.csv"
-    )
-    if not LOG_PATH.is_dir():
-        LOG_PATH.mkdir()
-    print(f"Logging results to {LOG_FILE}")
-    logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
-    logging.info(
-        "n_agents,trial,centralized,J,dt,t,ids"
-        "dist_left"
-    )
-
+    if centralized == True:
+        
+        LOG_PATH = Path(__file__).parent.parent / "logs"
+        LOG_FILE = LOG_PATH / strftime(
+            "cen-mpc-_%m-%d-%y_%H.%M.%S_{getpid()}.csv"
+        )
+        if not LOG_PATH.is_dir():
+            LOG_PATH.mkdir()
+        print(f"Logging results to {LOG_FILE}")
+        logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
+        logging.info(
+            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt"
+        )
+        
+    else:
+    
+        LOG_PATH = Path(__file__).parent.parent / "logs"
+        LOG_FILE = LOG_PATH / strftime(
+            "dec-mpc-_%m-%d-%y_%H.%M.%S_{getpid()}.csv"
+        )
+        if not LOG_PATH.is_dir():
+            LOG_PATH.mkdir()
+        print(f"Logging results to {LOG_FILE}")
+        logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
+        logging.info(
+            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,ids"
+        )
 
 def monte_carlo_analysis():
     """Benchmark to evaluate algorithm over many random initial conditions"""
 
     setup_logger()
 
-    n_trials_iter = range(3)
-    n_agents_iter = [3, 5, 10]
+    n_trials_iter = range(15)
+    # n_agents_iter = [3, 5, 10]
+    # n_agents_iter = [10, 15, 20] 
+    n_agents_iter = [15,20]
 
     dt = 0.1
     N = 15
-    ENERGY = 15.0
     radius = 0.5
-
+    
     # Change the for loops into multi-processing?
 
     for n_agents in n_agents_iter:
         print(f"\tn_agents: {n_agents}")
-        if n_agents >5:
-            radius = 0.25
+        if n_agents >=5 and n_agents <=10:
+            radius = 0.3
+            
+        if n_agents > 10:
+            radius = 0.1
+            
         for i_trial in n_trials_iter:
             print(f"\t\ttrial: {i_trial}")
             
             multi_agent_run(
-                n_agents, dt, N, radius, energy=15.0
-            )
+                i_trial, n_agents, dt, N, radius, \
+                 centralized=False)
+          
     
 def main():
+    
     monte_carlo_analysis()
 
 

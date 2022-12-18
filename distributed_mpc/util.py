@@ -3,7 +3,7 @@ import itertools
 from casadi import *
 import casadi as cs
 import decentralized as dec
-
+from decentralized import random_setup
 
 def paper_setup_3_quads(random = False):
     
@@ -15,8 +15,8 @@ def paper_setup_3_quads(random = False):
                     0.5, 1.5, 1, 0, 0, 0, 
                     1.5, 2.2, 1, 0, 0, 0]]).T
     if random == True:
-        x0[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
-        xf[dec.pos_mask([6]*3, 3)] += 0.01*np.random.randn(9, 1)
+        x0[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
+        xf[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
     return x0, xf
 
 def paper_setup_5_quads(random = False):
@@ -30,8 +30,8 @@ def paper_setup_5_quads(random = False):
          0.   ,  0.   ,  0.34 , -0.993, -0.832,  0.   ,  0.   ,  0.   ,
          1.094,  0.237,  0.137,  0.   ,  0.   ,  0.   ]]).T
     if random == True:
-        x0[dec.pos_mask([6]*5, 3)] += 0.01*np.random.randn(15, 1)
-        xf[dec.pos_mask([6]*5, 3)] += 0.01*np.random.randn(15, 1)
+        x0[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
+        xf[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
     
     return x0,xf
     
@@ -39,28 +39,55 @@ def paper_setup_5_quads(random = False):
 def paper_setup_10_quads(random = False):
     
     x0 = np.array([[ 0.357,  0.799,  1.504,  0.   ,  0.   ,  0.   ,  2.172,  2.283,
-         1.436,  0.   ,  0.   ,  0.   , -0.085,  0.577,  2.433,  0.   ,
-         0.   ,  0.   ,  0.378,  0.254,  2.488,  0.   ,  0.   ,  0.   ,
-         0.184,  0.344,  2.399,  0.   ,  0.   ,  0.   ,  2.094,  2.089,
+         1.436,  0.   ,  0.   ,  0.   , -0.085,  0.577,  2.01,  0.   ,
+         0.   ,  0.   ,  0.378,  0.254,  1.66,  0.   ,  0.   ,  0.   ,
+         0.184,  0.344,  2.139,  0.   ,  0.   ,  0.   ,  2.094,  2.089,
          1.304,  0.   ,  0.   ,  0.   , -2.219, -3.09 ,  1.487,  0.   ,
          0.   ,  0.   , -0.6  , -0.406,  1.319,  0.   ,  0.   ,  0.   ,
         -2.059, -3.279,  1.48 ,  0.   ,  0.   ,  0.   , -0.222,  0.43 ,
          2.325,  0.   ,  0.   ,  0.   ]]).T
-    xf = np.array([[ 1.115,  1.749,  3.871,  0.   ,  0.   ,  0.   ,  0.653,  1.288,
-         1.529,  0.   ,  0.   ,  0.   , -1.373, -0.243,  2.488,  0.   ,
+    xf = np.array([[ 1.115,  1.749,  2.1,  0.   ,  0.   ,  0.   ,  0.653,  1.288,
+         1.529,  0.   ,  0.   ,  0.   , -1.373, -0.243,  1.9,  0.   ,
          0.   ,  0.   , -1.314,  0.229,  1.771,  0.   ,  0.   ,  0.   ,
          1.735,  1.558,  2.081,  0.   ,  0.   ,  0.   ,  0.852, -1.583,
          2.264,  0.   ,  0.   ,  0.   ,  0.387, -1.5  ,  1.685,  0.   ,
-         0.   ,  0.   , -1.26 , -0.697,  2.494,  0.   ,  0.   ,  0.   ,
+         0.   ,  0.   , -1.26 , -0.697,  1.85,  0.   ,  0.   ,  0.   ,
         -0.213, -0.138,  1.545,  0.   ,  0.   ,  0.   , -0.582, -0.663,
-         2.518,  0.   ,  0.   ,  0.   ]]).T
+         1.69,  0.   ,  0.   ,  0.   ]]).T
     
     if random == True:
         
-        x0[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
-        xf[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
+        x0[dec.pos_mask([6]*10, 3)] += 0.05*np.random.randn(30, 1)
+        xf[dec.pos_mask([6]*10, 3)] += 0.05*np.random.randn(30, 1)
 
     return x0,xf
+
+def paper_setup_15_quads():
+    
+    x0,xf = random_setup(15,6,n_d=3,energy=15,var=15/2)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
+        
+    return x0,xf
+
+def paper_setup_20_quads():
+    
+    x0,xf = random_setup(20,6,n_d=3,energy=55,var=20/2)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.4 + np.random.rand(1,)*0.1
+        
+    return x0,xf
+
 
 def generate_f(x_dims_local):
     g = 9.8
@@ -77,6 +104,34 @@ def generate_f(x_dims_local):
             x_dot[i_xstart:i_xstart + n_states] = cs.vertcat(
                 x[i_xstart + 3: i_xstart + 6],
                 g*cs.tan(u[i_ustart]), -g*cs.tan(u[i_ustart+1]), u[i_ustart+2] - g
+                )
+            
+        return x_dot
+    
+    return f
+
+def generate_f_human_drone(x_dims_local,n_human):
+    g = 9.8
+    # NOTE: Assume homogeneity of agents.
+    n_agents = len(x_dims_local)
+    n_states = x_dims_local[0]
+    n_controls = 3
+    
+    def f(x, u):
+        x_dot = cs.MX.zeros(x.numel())
+        for i_agent in range(n_agents-n_human):
+            i_xstart = i_agent * n_states
+            i_ustart = i_agent * n_controls
+            x_dot[i_xstart:i_xstart + n_states] = cs.vertcat(
+                x[i_xstart + 3: i_xstart + 6],
+                g*cs.tan(u[i_ustart]), -g*cs.tan(u[i_ustart+1]), u[i_ustart+2] - g
+                )
+        for j_agent in range(n_human):
+            j_xstart = j_agent * n_states
+            j_ustart = j_agent * (n_controls-1) #human agent has 2 control var.
+            x_dot[j_xstart:j_xstart + n_states] = cs.vertcat(
+                x[j_xstart + 3]*cs.sin(u[j_start]), x[j_xstart+3]*cs.cos(u[j_start]),0,
+                u[j_start+1], 0 , 0
                 )
             
         return x_dot
@@ -225,6 +280,34 @@ def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
 
             
     return distances #this is a list of symbolic pariwise distances
+
+def compute_pairwise_distance_nd_Sym(X, x_dims, n_dims):
+    """Analog to the above whenever some agents only use distance in the x-y plane"""
+    CYLINDER_RADIUS = 0.2
+
+    n_states = x_dims[0]
+    n_agents = len(x_dims)
+    distances = []
+    eps = 1e-3
+
+    for i, n_dim_i in zip(range(n_agents), n_dims):
+        for j, n_dim_j in zip(range(i + 1, n_agents), n_dims[i + 1 :]):
+            n_dim = min(n_dim_i, n_dim_j)
+            # print(i,j)
+            Xi = X[i * n_states : i * n_states + n_dim, :]
+            Xj = X[j * n_states : j * n_states + n_dim, :]
+            dX = Xi-Xj
+            # print(dX.shape)
+            if n_dim == 3:
+                dist = dX[0,:]**2+dX[1,:]**2+dX[2,:]**2
+            else:
+                diff = dX[0,:]**2+dX[1,:]**2
+
+            distances.append(sqrt(dist + eps)-CYLINDER_RADIUS)
+    
+    return distances
+
+
 
 
 

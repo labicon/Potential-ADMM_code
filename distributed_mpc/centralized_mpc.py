@@ -2,6 +2,7 @@ import casadi as cs
 import numpy as np
 from scipy.constants import g
 from casadi import *
+import logging
 
 from util import (
     compute_pairwise_distance,
@@ -18,9 +19,7 @@ from util import (
 
 #Define constants for constraints
 
-
-
-def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
+def solve_rhc(j_trial,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
              max_input,min_input,max_state,min_state):
     #N is the shifting prediction horizon
     
@@ -28,7 +27,7 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     s_opts = {"max_iter": 1000,"print_level":0}
     
     
-    M = 200 # this is the entire fixed horizon
+    M = 100  # this is the maximum number of outer iterations
  
     n_x = n_agents*n_states
     n_u = n_agents*n_inputs
@@ -44,7 +43,8 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     # for i in range(M) :
     i = 0
     dt = 0.1
-    
+    failed_count = 0
+    converged = False
     while np.any(distance_to_goal(x0,xf,n_agents,n_states) > 0.1)  and (i < M):
         
         
@@ -91,8 +91,15 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         opti.solver("ipopt",p_opts,
                     s_opts) 
         
-        
-        sol = opti.solve()
+        try:
+            sol = opti.solve()
+            
+        except RuntimeError:
+            print('Current problem is infeasible \n')
+            failed_count +=1
+            return X_full,U_full, t, J_list, failed_count, converged
+            
+            
         # print(opti.debug.value)
         x0 = sol.value(X)[:,1].reshape(-1,1)
         # print(x0.shape)
@@ -100,7 +107,7 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         
         J_list.append(sol.value(cost_fun))
         print(f'current objective function value is {sol.value(cost_fun)}')
-        
+         
         
         #Store the trajectory
         
@@ -110,12 +117,18 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         t += dt
         i += 1
         
-        # print(opti.variable) #print this to check the optimization parameters for each control horizon
         
-        if abs(J_list[i]-J_list[i-1]) <= 1.0 :
-            print(f'Terminated! at i = {i}')
+        if np.all(distance_to_goal(x0, xf, n_agents, n_states) <= 0.1):
+            converged = True
+            print(f"Terminated! at loop = {i}, converged is {converged}")
+
             break
             
+    logging.info(
+    f'{j_trial},'
+    f'{n_agents},{t},{failed_count},{converged},'
+    f'{objective_val},{N},{dt},'
+        )
         
-    return X_full,U_full, t, J_list[-1]
+    return X_full,U_full, t, J_list, failed_count, converged
 

@@ -3,12 +3,13 @@ import numpy as np
 from scipy.constants import g
 from casadi import *
 from util import *
+import logging
+import util
 
 def solve_rhc_distributed(
-    x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
-    x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
-  theta_min,tau_max,tau_min,phi_max,phi_min
-):
+    j_trial,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,\
+    x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,\
+  theta_min,tau_max,tau_min,phi_max,phi_min):
 
     x_dims = [n_states] * n_agents
     u_dims = [n_inputs] * n_agents
@@ -16,8 +17,8 @@ def solve_rhc_distributed(
     p_opts = {"expand": True}
     s_opts = {"max_iter": 200, "print_level": 0}
 
-    M = 100  # this is the entire fixed horizon
-
+    M = 100  # this is the maximum number of outer iterations
+    
     n_x = n_agents * n_states
     n_u = n_agents * n_inputs
     t = 0
@@ -30,7 +31,9 @@ def solve_rhc_distributed(
 
     X_full = np.zeros((0, n_x))
     U_full = np.zeros((0, n_u))
-
+    
+    failed_count = 0
+    converged = False
     while np.any(distance_to_goal(x0, xf, n_agents, n_states) > 0.1) and (loop < M):
 
         ######################################################################
@@ -40,9 +43,9 @@ def solve_rhc_distributed(
         if loop > 0:
             print(f"re-optimizing at {x0.T}")
 
-        rel_dists = compute_pairwise_distance(x0, x_dims, n_d=3)
+        rel_dists = util.compute_pairwise_distance(x0, x_dims, n_d=3)
 
-        graph = define_inter_graph_threshold(x0, radius, x_dims, ids)
+        graph = util.define_inter_graph_threshold(x0, radius, x_dims, ids)
 
         print(
             f"current interaction graph is {graph}, the pairwise distances between each agent is {rel_dists}"
@@ -188,8 +191,14 @@ def solve_rhc_distributed(
             )
 
             di.solver("ipopt", p_opts, s_opts)
-
-            sol = di.solve()
+            
+            try:
+                sol = di.solve()
+                
+            except RuntimeError:
+                print('Current problem is infeasible')
+                failed_count +=1
+                return X_full, U_full, t, J_list, failed_count, converged
 
             objective_val += sol.value(costi)
             print(
@@ -211,7 +220,7 @@ def solve_rhc_distributed(
                 i_prob * n_inputs : (i_prob + 1) * n_inputs
             ]
 
-        # PROBLEM RIGHT HERE!!! somehow I get a bunch of unexpected zeros at this step (in the current solution x0)
+     
         x0 = X_dec.reshape(-1, 1)
         print(f"current collected solution is {x0.T}#")
 
@@ -232,10 +241,18 @@ def solve_rhc_distributed(
 
         t += dt
         loop += 1
+     
+        if np.all(distance_to_goal(x0, xf, n_agents, n_states) <= 0.1):
+            converged = True
+            print(f"Terminated! at loop = {loop}, converged is {converged}")
 
-        if abs(J_list[loop] - J_list[loop - 1]) <= 1:
-            print(f"Terminated! at loop = {loop}")
             break
 
+    logging.info(
+        f'{j_trial},'
+        f'{n_agents},{t},{failed_count},{converged},'
+        f'{objective_val},{N},{dt},"{ids}",'
+    )
+        
 
-    return X_full, U_full, t, J_list[-1]
+    return X_full, U_full, t, J_list, failed_count, converged
