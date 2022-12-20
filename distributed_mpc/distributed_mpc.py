@@ -9,18 +9,19 @@ import util
 def solve_rhc_distributed(
     j_trial,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,\
     x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,\
-  theta_min,tau_max,tau_min,phi_max,phi_min):
+  theta_min,tau_max,tau_min,phi_max,phi_min,n_dims=None):
 
     x_dims = [n_states] * n_agents
     u_dims = [n_inputs] * n_agents
-
+    
     p_opts = {"expand": True}
     s_opts = {"max_iter": 200, "print_level": 0}
 
     M = 100  # this is the maximum number of outer iterations
     
     n_x = n_agents * n_states
-    n_u = n_agents * n_inputs
+    # n_u = n_agents * n_inputs
+    n_u = sum(u_dims)
     t = 0
 
     J_list = []
@@ -34,6 +35,10 @@ def solve_rhc_distributed(
     
     failed_count = 0
     converged = False
+    
+    n_humans = len(n_dims)
+    id_humans = ids[-n_humans:]
+    
     while np.any(distance_to_goal(x0, xf, n_agents, n_states) > 0.1) and (loop < M):
 
         ######################################################################
@@ -42,10 +47,15 @@ def solve_rhc_distributed(
         # compute interaction graph at the current time step:
         if loop > 0:
             print(f"re-optimizing at {x0.T}")
-
-        rel_dists = util.compute_pairwise_distance(x0, x_dims, n_d=3)
-
-        graph = util.define_inter_graph_threshold(x0, radius, x_dims, ids)
+            
+        # rel_dists = util.compute_pairwise_distance(x0, x_dims, n_d=3)
+        rel_dists = util.compute_pairwise_distance_nd_Sym(x0,x_dims,n_dims)
+        #Pairwise distance between any agent and a human agent is the 2-D planar Euclidean distance
+        #since the human agent is assumed to be a cylindrical object with constant height
+        
+        #How do I know if the current subproblem has a human agent?
+        # ids[-n_humans:]: id(s) of the human agents
+        graph = util.define_inter_graph_threshold(x0, radius, x_dims, ids, n_dims)
 
         print(
             f"current interaction graph is {graph}, the pairwise distances between each agent is {rel_dists}"
@@ -106,13 +116,14 @@ def solve_rhc_distributed(
                           theta_min,tau_max,tau_min,phi_max,phi_min)
         min_max_state_list = generate_min_max_state(states, n_states,x_min,
                           x_max,y_min,y_max,z_min,z_max,v_min,v_max)
-
+        # print(f'min_max_input_list has length {len(min_max_input_list)}')
         ##########################################################################
         # Solve each sub-problem in a sequential manner:
-
+        
         objective_val = 0
         X_dec = np.zeros((1, n_x))
         U_dec = np.zeros((1, n_u))
+        
         for (
             di,
             statesi,
@@ -146,13 +157,26 @@ def solve_rhc_distributed(
             # print(f'n_states_local:{n_states_local}')
             n_inputs_local = inputsi.shape[0]
             x_dims_local = [int(n_states)] * int(n_states_local / n_states)
-
+        
             print(f"current sub-problem has state dimension : {x_dims_local}")
-            # u_dims_local =  [int(n_inputs_local/(n_inputs_local/n_inputs))]*int(n_inputs_local/n_inputs)
-            # i.e, [6,6] if the current sub-problem has 2 agents combined, or [6,6,6] if 3 agents are combined
-
-            f = generate_f(x_dims_local)
-
+           
+            if any(item in ids_ for item in id_humans):
+                
+                human_count = sum(item in ids_ for item in id_humans)
+                drones_count = len(x_dims_local)-human_count
+                #print(f'{human_count} human agents are detected in the sub problem')
+                n_dims_local = [3]*drones_count
+                n_dims_local+=[2]*2
+                f = generate_f_human_drone(x_dims_local,human_count)
+            else:
+                f = generate_f(x_dims_local)
+                drones_count = len(x_dims_local)
+                n_dims_local = [3]*drones_count
+                human_count = None
+                
+            
+            #Only impose constraints on the drones
+            
             for k in range(N):  # loop over control intervals
                 # Runge-Kutta 4 integration
 
@@ -163,8 +187,8 @@ def solve_rhc_distributed(
                 x_next = statesi[:, k] + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
 
                 di.subject_to(statesi[:, k + 1] == x_next)  # close the gaps
-
-                di.subject_to(inputsi[:, k] <= max_inputs.T)
+            
+                di.subject_to(inputsi[: ,k] <= max_inputs.T)
                 di.subject_to(min_inputs.T <= inputsi[:, k])
 
             for k in range(N + 1):
@@ -172,15 +196,11 @@ def solve_rhc_distributed(
                 di.subject_to(statesi[:, k] <= max_states.T)
                 di.subject_to(min_states.T <= statesi[:, k])
 
-                # DBG
-                # distances, d_test = compute_pairwise_distance_Sym(statesi[:,k], x_dims_local)
-                # print(distances, d_test)
-
                 # collision avoidance over control horizon (only if the current sub-problem contains the states of more than 1 agent):
 
                 if len(x_dims_local) != 1:
-                    distances = compute_pairwise_distance_Sym(
-                        statesi[:, k], x_dims_local
+                    distances = compute_pairwise_distance_nd_Sym(
+                        statesi[:, k], x_dims_local, n_dims_local
                     )
                     for n in distances:
                         di.subject_to(n >= radius)
@@ -199,7 +219,8 @@ def solve_rhc_distributed(
                 print('Current problem is infeasible')
                 failed_count +=1
                 return X_full, U_full, t, J_list, failed_count, converged
-
+                # break
+                
             objective_val += sol.value(costi)
             print(
                 f"objective value for the {count}th subproblem at iteration {loop} is {sol.value(costi)}"

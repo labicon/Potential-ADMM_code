@@ -119,19 +119,24 @@ def generate_f_human_drone(x_dims_local,n_human):
     
     def f(x, u):
         x_dot = cs.MX.zeros(x.numel())
-        for i_agent in range(n_agents-n_human):
+        for i_agent in range(0,n_agents-n_human):
             i_xstart = i_agent * n_states
             i_ustart = i_agent * n_controls
             x_dot[i_xstart:i_xstart + n_states] = cs.vertcat(
                 x[i_xstart + 3: i_xstart + 6],
                 g*cs.tan(u[i_ustart]), -g*cs.tan(u[i_ustart+1]), u[i_ustart+2] - g
                 )
-        for j_agent in range(n_human):
+        count = 0
+        for j_agent in range(n_agents-n_human,n_agents):
             j_xstart = j_agent * n_states
-            j_ustart = j_agent * (n_controls-1) #human agent has 2 control var.
+            j_ustart = j_agent * n_controls #human agent has 2 control var.
+            if count > 0:
+                j_ustart -=1
+            count +=1
+            
             x_dot[j_xstart:j_xstart + n_states] = cs.vertcat(
-                x[j_xstart + 3]*cs.sin(u[j_start]), x[j_xstart+3]*cs.cos(u[j_start]),0,
-                u[j_start+1], 0 , 0
+                x[j_xstart + 3]*cs.cos(u[j_ustart]), x[j_xstart+3]*cs.sin(u[j_ustart]),0,
+                u[j_ustart+1], 0 , 0
                 )
             
         return x_dot
@@ -218,13 +223,18 @@ def split_graph(Z, z_dims, graph):
     return z_split
 
 
-def define_inter_graph_threshold(X, radius, x_dims, ids):
+def define_inter_graph_threshold(X, radius, x_dims, ids, n_dims=None):
     """Compute the interaction graph based on a simple thresholded distance
     for each pair of agents sampled over the trajectory
     """
 
     planning_radii = 2 * radius
-    rel_dists = compute_pairwise_distance(X, x_dims)
+    
+    if n_dims:
+        rel_dists = np.array([compute_pairwise_distance_nd_Sym(X, x_dims, n_dims)])
+    else:    
+        rel_dists = compute_pairwise_distance(X, x_dims)
+    
     print(f'determining interaction graph with the following pair-wise distance : {rel_dists}')
     # N = X.shape[0]
     # n_samples = 10
@@ -283,7 +293,7 @@ def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
 
 def compute_pairwise_distance_nd_Sym(X, x_dims, n_dims):
     """Analog to the above whenever some agents only use distance in the x-y plane"""
-    CYLINDER_RADIUS = 0.3
+    CYLINDER_RADIUS = 0.2
 
     n_states = x_dims[0]
     n_agents = len(x_dims)
@@ -299,11 +309,9 @@ def compute_pairwise_distance_nd_Sym(X, x_dims, n_dims):
             dX = Xi-Xj
             # print(dX.shape)
             if n_dim == 3:
-                dist = dX[0,:]**2+dX[1,:]**2+dX[2,:]**2
+                distances.append(sqrt(dX[0,:]**2+dX[1,:]**2+dX[2,:]**2+eps))
             else:
-                diff = dX[0,:]**2+dX[1,:]**2
-
-            distances.append(sqrt(dist + eps)+CYLINDER_RADIUS)
+                distances.append(sqrt(dX[0,:]**2+dX[1,:]**2 + eps)+CYLINDER_RADIUS)
     
     return distances
 
