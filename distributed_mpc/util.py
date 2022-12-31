@@ -162,30 +162,45 @@ def objective(X, U, u_ref, xf, Q, R, Qf):
     return total_stage_cost + total_terminal_cost
 
 def generate_min_max_input(inputs_dict, n_inputs,theta_max,
-                          theta_min,tau_max,tau_min,phi_max,phi_min):
+                          theta_min,tau_max,tau_min,phi_max,phi_min,human_count = None):
 
     n_agents = [u.shape[0] // n_inputs for u in inputs_dict.values()]
 
     u_min = np.array([[theta_min, phi_min, tau_min]])
     u_max = np.array([[theta_max, phi_max, tau_max]])
-
-    return [
+    
+    if human_count:
+        return [
         (np.tile(u_min, n_agents_i), np.tile(u_max, n_agents_i))
-        for n_agents_i in n_agents
-    ]
+        for n_agents_i in (n_agents-human_count)
+        ]
+    
+    else:
+        return [
+            (np.tile(u_min, n_agents_i), np.tile(u_max, n_agents_i))
+            for n_agents_i in n_agents
+        ]
 
 
 def generate_min_max_state(states_dict, n_states, x_min,
-                          x_max,y_min,y_max,z_min,z_max,v_min,v_max):
+                          x_max,y_min,y_max,z_min,z_max,v_min,v_max,human_count = None):
 
     n_agents = [x.shape[0] // n_states for x in states_dict.values()]
     x_min = np.array([[x_min, y_min, z_min, v_min, v_min, v_min]])
     x_max = np.array([[x_max, y_max, z_max, v_max, v_max, v_max]])
-
-    return [
+    
+    if human_count:
+        return [
         (np.tile(x_min, n_agents_i), np.tile(x_max, n_agents_i))
-        for n_agents_i in n_agents
-    ]
+        for n_agents_i in (n_agents-human_count)
+        ]
+    
+    else:
+        
+        return [
+            (np.tile(x_min, n_agents_i), np.tile(x_max, n_agents_i))
+            for n_agents_i in n_agents
+        ]
 
 
 def distance_to_goal(x,xf,n_agents,n_states):

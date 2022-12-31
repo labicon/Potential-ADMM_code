@@ -9,7 +9,7 @@ import util
 def solve_rhc_distributed(
     j_trial,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,\
     x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,\
-  theta_min,tau_max,tau_min,phi_max,phi_min,n_dims=None):
+  theta_min,tau_max,tau_min,phi_max,phi_min,n_humans,n_dims=None):
 
     x_dims = [n_states] * n_agents
     u_dims = [n_inputs] * n_agents
@@ -35,8 +35,7 @@ def solve_rhc_distributed(
     
     failed_count = 0
     converged = False
-    
-    n_humans = len(n_dims)
+
     id_humans = ids[-n_humans:]
     
     while np.any(distance_to_goal(x0, xf, n_agents, n_states) > 0.1) and (loop < M):
@@ -46,7 +45,7 @@ def solve_rhc_distributed(
 
         # compute interaction graph at the current time step:
         if loop > 0:
-            print(f"re-optimizing at {x0.T}")
+            print(f"re-optimizing at {x0.T} \n")
             
         # rel_dists = util.compute_pairwise_distance(x0, x_dims, n_d=3)
         rel_dists = util.compute_pairwise_distance_nd_Sym(x0,x_dims,n_dims)
@@ -58,7 +57,7 @@ def solve_rhc_distributed(
         graph = util.define_inter_graph_threshold(x0, radius, x_dims, ids, n_dims)
 
         print(
-            f"current interaction graph is {graph}, the pairwise distances between each agent is {rel_dists}"
+            f"current interaction graph is {graph}, the pairwise distances between each agent is {rel_dists} \n"
         )
         # x0 is updated until convergence (treat x0 as the combined CURRENT state)
 
@@ -116,6 +115,7 @@ def solve_rhc_distributed(
                           theta_min,tau_max,tau_min,phi_max,phi_min)
         min_max_state_list = generate_min_max_state(states, n_states,x_min,
                           x_max,y_min,y_max,z_min,z_max,v_min,v_max)
+        
         # print(f'min_max_input_list has length {len(min_max_input_list)}')
         ##########################################################################
         # Solve each sub-problem in a sequential manner:
@@ -144,7 +144,7 @@ def solve_rhc_distributed(
             range(len(d)),
         ):  # loop over sub-problems
 
-            print(f"Solving the {count}th sub-problem at iteration {loop}, t = {t}")
+            print(f"Solving the {count}th sub-problem at iteration {loop}, t = {t} \n")
 
             min_states, max_states = state_boundsi
             min_inputs, max_inputs = input_boundsi
@@ -158,7 +158,7 @@ def solve_rhc_distributed(
             n_inputs_local = inputsi.shape[0]
             x_dims_local = [int(n_states)] * int(n_states_local / n_states)
         
-            print(f"current sub-problem has state dimension : {x_dims_local}")
+            print(f"current sub-problem has state dimension : {x_dims_local} \n")
            
             if any(item in ids_ for item in id_humans):
                 
@@ -174,7 +174,8 @@ def solve_rhc_distributed(
                 n_dims_local = [3]*drones_count
                 human_count = None
                 
-            
+            print(f'number of drones in the current subproblem is {drones_count}\n')
+            print(f'number of humans in the current subproblem is {human_count}\n')
             #Only impose constraints on the drones
             
             for k in range(N):  # loop over control intervals
@@ -188,13 +189,20 @@ def solve_rhc_distributed(
 
                 di.subject_to(statesi[:, k + 1] == x_next)  # close the gaps
             
-                di.subject_to(inputsi[: ,k] <= max_inputs.T)
-                di.subject_to(min_inputs.T <= inputsi[:, k])
+                # di.subject_to(inputsi[: ,k] <= max_inputs.T)
+                # di.subject_to(min_inputs.T <= inputsi[:, k])
+                
+                if drones_count !=0:
+                    # print(f'inputsi has shape{inputsi[0:drones_count*n_inputs,k].shape},max_inputs has shape{max_inputs.shape}\n')
+                    di.subject_to(inputsi[0:drones_count*n_inputs,k] <= max_inputs[: , 0:drones_count*n_inputs].T)
+                    di.subject_to(min_inputs[: , 0:drones_count*n_inputs].T <= inputsi[0:drones_count*n_inputs,k])
+                
 
             for k in range(N + 1):
-
-                di.subject_to(statesi[:, k] <= max_states.T)
-                di.subject_to(min_states.T <= statesi[:, k])
+                if drones_count !=0:
+                    # print(f'statesi has shape{statesi[0:drones_count*n_states,k].shape},max_states has shape{max_states.shape}\n')
+                    di.subject_to(statesi[0:drones_count*n_states, k] <= max_states[:, 0:drones_count*n_states].T)
+                    di.subject_to(min_states[:, 0:drones_count*n_states].T <= statesi[0:drones_count*n_states, k])
 
                 # collision avoidance over control horizon (only if the current sub-problem contains the states of more than 1 agent):
 
@@ -223,7 +231,7 @@ def solve_rhc_distributed(
                 
             objective_val += sol.value(costi)
             print(
-                f"objective value for the {count}th subproblem at iteration {loop} is {sol.value(costi)}"
+                f"objective value for the {count}th subproblem at iteration {loop} is {sol.value(costi)} \n"
             )
             # print(sol.value(statesi).shape)
             x0_local = sol.value(statesi)[:, 1]
@@ -243,7 +251,7 @@ def solve_rhc_distributed(
 
      
         x0 = X_dec.reshape(-1, 1)
-        print(f"current collected solution is {x0.T}#")
+        print(f"current collected solution is {x0.T} \n")
 
         # print(x0)
         J_list.append(
@@ -265,7 +273,7 @@ def solve_rhc_distributed(
      
         if np.all(distance_to_goal(x0, xf, n_agents, n_states) <= 0.1):
             converged = True
-            print(f"Terminated! at loop = {loop}, converged is {converged}")
+            print(f"Terminated! at loop = {loop}, converged is {converged} \n")
 
             break
 
