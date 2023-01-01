@@ -67,18 +67,19 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
     
     if n_agents == 3:
         x0,xf = util.paper_setup_3_quads(True)
-        
+        n_dims = [3]*3
     elif n_agents == 5:
         x0,xf = util.paper_setup_5_quads(True)
-        
+        n_dims = [3]*5
     elif n_agents == 10:
         x0,xf = util.paper_setup_10_quads(True)
-        
+        n_dims = [3]*10
     elif n_agents == 15:
         x0,xf = util.paper_setup_15_quads()
-        
+        n_dims = [3]*15
     elif n_agents == 20:
         x0,xf = util.paper_setup_20_quads()
+        n_dims = [3]*20
         
     
     ids = [100 + i for i in range(n_agents)]
@@ -118,7 +119,7 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
                 x_min,x_max,y_min,y_max,z_min,z_max,v_min,
                 v_max,theta_max,
                 theta_min,tau_max,
-                tau_min,phi_max,phi_min
+                tau_min,phi_max,phi_min,0,n_dims
                                 )
 
 def setup_logger(centralized=False):
@@ -148,7 +149,7 @@ def setup_logger(centralized=False):
         print(f"Logging results to {LOG_FILE}")
         logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
         logging.info(
-            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,ids"
+            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,ids,radius"
         )
 
 def monte_carlo_analysis():
@@ -156,13 +157,13 @@ def monte_carlo_analysis():
 
     setup_logger()
 
-    n_trials_iter = range(15)
+    n_trials_iter = range(30)
+    n_agents_iter =[10,15]
     # n_agents_iter = [3, 5, 10]
     # n_agents_iter = [10, 15, 20] 
-    n_agents_iter = [15,20]
 
     dt = 0.1
-    N = 15
+    N = 10
     radius = 0.5
     
     # Change the for loops into multi-processing?
@@ -170,7 +171,7 @@ def monte_carlo_analysis():
     for n_agents in n_agents_iter:
         print(f"\tn_agents: {n_agents}")
         if n_agents >=5 and n_agents <=10:
-            radius = 0.3
+            radius = 0.2
             
         if n_agents > 10:
             radius = 0.1

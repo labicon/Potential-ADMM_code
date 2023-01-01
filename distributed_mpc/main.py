@@ -50,7 +50,7 @@ if __name__ == "__main__" :
     print("Choose the number of agents (3,5, 10 or 15):")
     n_agents = int(input())
     
-    print("Choose the number of human agents (1,2, or 3): ")
+    print("Choose the number of human agents (0, 1,2, or 3): ")
     n_human_agents = int(input())
     
     print("Choose the distributed or centralized:")
@@ -65,6 +65,7 @@ if __name__ == "__main__" :
         Q = np.diag([5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1])
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
+        n_dims = [3]*3
         max_input = np.tile(max_input_base,n_agents)
         min_input = np.tile(min_input_base,n_agents)
         max_state = np.tile(max_state_base,n_agents)
@@ -78,6 +79,7 @@ if __name__ == "__main__" :
                      5,5,5,1,1,1,5,5,5,1,1,1])
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
+        n_dims = [3]*5
         max_input = np.tile(max_input_base,n_agents)
         min_input = np.tile(min_input_base,n_agents)
         max_state = np.tile(max_state_base,n_agents)
@@ -93,6 +95,7 @@ if __name__ == "__main__" :
                     5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1])
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
+        n_dims = [3]*10
         max_input = np.tile(max_input_base,n_agents)
         min_input = np.tile(min_input_base,n_agents)
         max_state = np.tile(max_state_base,n_agents)
@@ -111,6 +114,7 @@ if __name__ == "__main__" :
                     5,5,5,1,1,1,5,5,5,1,1,1])
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
+        n_dims = [3]*15
         max_input = np.tile(max_input_base,n_agents)
         min_input = np.tile(min_input_base,n_agents)
         max_state = np.tile(max_state_base,n_agents)
@@ -136,7 +140,7 @@ if __name__ == "__main__" :
             X_full, U_full, t, J_list, failed_count, converged = solve_rhc_distributed(
                                             0,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
                                             x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
-                                              theta_min,tau_max,tau_min,phi_max,phi_min
+                                              theta_min,tau_max,tau_min,phi_max,phi_min,n_human_agents,n_dims
                                                 )
             
     np.save(file_name, X_full,U_full,t)

@@ -5,6 +5,7 @@ from casadi import *
 from util import *
 import logging
 import util
+from time import perf_counter
 
 def solve_rhc_distributed(
     j_trial,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,\
@@ -17,7 +18,7 @@ def solve_rhc_distributed(
     p_opts = {"expand": True}
     s_opts = {"max_iter": 200, "print_level": 0}
 
-    M = 100  # this is the maximum number of outer iterations
+    M = 150  # this is the maximum number of outer iterations
     
     n_x = n_agents * n_states
     # n_u = n_agents * n_inputs
@@ -35,8 +36,11 @@ def solve_rhc_distributed(
     
     failed_count = 0
     converged = False
-
-    id_humans = ids[-n_humans:]
+    
+    if n_humans!=0:
+        id_humans = ids[-n_humans:]
+    else:
+        id_humans = None
     
     while np.any(distance_to_goal(x0, xf, n_agents, n_states) > 0.1) and (loop < M):
 
@@ -159,15 +163,15 @@ def solve_rhc_distributed(
             x_dims_local = [int(n_states)] * int(n_states_local / n_states)
         
             print(f"current sub-problem has state dimension : {x_dims_local} \n")
-           
-            if any(item in ids_ for item in id_humans):
-                
-                human_count = sum(item in ids_ for item in id_humans)
-                drones_count = len(x_dims_local)-human_count
-                #print(f'{human_count} human agents are detected in the sub problem')
-                n_dims_local = [3]*drones_count
-                n_dims_local+=[2]*2
-                f = generate_f_human_drone(x_dims_local,human_count)
+            if n_humans !=0:
+                if any(item in ids_ for item in id_humans):
+                    
+                    human_count = sum(item in ids_ for item in id_humans)
+                    drones_count = len(x_dims_local)-human_count
+                    #print(f'{human_count} human agents are detected in the sub problem')
+                    n_dims_local = [3]*drones_count
+                    n_dims_local+=[2]*2
+                    f = generate_f_human_drone(x_dims_local,human_count)
             else:
                 f = generate_f(x_dims_local)
                 drones_count = len(x_dims_local)
@@ -221,14 +225,15 @@ def solve_rhc_distributed(
             di.solver("ipopt", p_opts, s_opts)
             
             try:
+                
                 sol = di.solve()
                 
             except RuntimeError:
                 print('Current problem is infeasible')
                 failed_count +=1
-                return X_full, U_full, t, J_list, failed_count, converged
-                # break
-                
+                # return X_full, U_full, t, J_list, failed_count, converged
+                break
+            
             objective_val += sol.value(costi)
             print(
                 f"objective value for the {count}th subproblem at iteration {loop} is {sol.value(costi)} \n"
@@ -280,7 +285,7 @@ def solve_rhc_distributed(
     logging.info(
         f'{j_trial},'
         f'{n_agents},{t},{failed_count},{converged},'
-        f'{objective_val},{N},{dt},"{ids}",'
+        f'{objective_val},{N},{dt},"{ids}",{radius},'
     )
         
 
