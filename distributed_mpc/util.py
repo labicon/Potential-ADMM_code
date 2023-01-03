@@ -19,6 +19,15 @@ def paper_setup_3_quads(random = False):
         xf[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
     return x0, xf
 
+def paper_setup_4_quads(random=False):
+    x0=np.random.rand(24, 1).T
+    xf=np.random.rand(24, 1).T
+    if random==True: 
+        x0[dec.pos_mask([6]*4, 3)]+= 0.05*np.random.randn(12, 1)
+        xf[dec.pos_mask([6]*4, 3)]+= 0.05*np.random.randn(12, 1)
+
+    return x0, xf
+
 def paper_setup_5_quads(random = False):
     x0 = np.array([[-0.182, -0.545,  1.161,  0.   ,  0.   ,  0.   ,  1.335,  1.484,
          0.5  ,  0.   ,  0.   ,  0.   , -0.97 , -0.831,  2.295,  0.   ,
@@ -34,6 +43,42 @@ def paper_setup_5_quads(random = False):
         xf[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
     
     return x0,xf
+
+def paper_setup_6_quads(random = False):
+    x0=np.random.rand(36,1).T
+    xf=np.random.rand(36,1).T
+    if random==True: 
+        x0[dec.pos_mask([6]*6, 3)]+= 0.05*np.random.randn(18, 1)
+        xf[dec.pos_mask([6]*6, 3)]+=0.05*np.random.randn(18, 1)
+
+    return x0, xf
+
+def paper_setup_7_quads(random=False):
+    x0=np.random.rand(42, 1).T
+    xf=np.random.rand(42, 1).T
+    if random==True:
+        x0[dec.pos_mask([6]*7, 3)]+= 0.05*np.random.rand(21, 1)
+        xf[dec.pos_mask([6]*7, 3)]+= 0.05*np.random.rand(21, 1)
+
+    return x0, xf
+
+def paper_setup_8_quads(random=False):
+    x0=np.random.rand(48, 1).T
+    xf=np.random.rand(48, 1).T
+    if random==True:
+        x0[dec.pos_mask([6]*8, 3)]+= 0.05*np.random.rand(24, 1)
+        xf[dec.pos_mask([6]*8, 3)]+= 0.05*np.random.rand(24, 1)
+
+    return x0, xf
+
+def paper_setup_9_quads(random=False):
+    x0=np.random.rand(54, 1).T
+    xf=np.random.rand(54, 1).T
+    if random==True: 
+        x0[dec.pos_mask([6]*9, 3)]+= 0.05*np.random.rand(27, 1)
+        xf[dec.pos_mask([6]*9, 3)]+= 0.05*np.random.rand(27, 1)
+
+    return x0, xf
     
     
 def paper_setup_10_quads(random = False):

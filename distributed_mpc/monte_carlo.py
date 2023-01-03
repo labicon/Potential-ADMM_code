@@ -68,9 +68,24 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
     if n_agents == 3:
         x0,xf = util.paper_setup_3_quads(True)
         n_dims = [3]*3
+    elif n_agents==4:
+        x0, xf=util.paper_setup_4_quads(True)
+        n_dims=[3]*4
     elif n_agents == 5:
         x0,xf = util.paper_setup_5_quads(True)
         n_dims = [3]*5
+    elif n_agents==6:
+        x0, xf=util.paper_setup_6_quads(True)
+        n_dims= [3]*6
+    elif n_agents==7:
+        x0, xf=util.paper_setup_7_quads(True)
+        n_dims= [3]*7
+    elif n_agents==8:
+        x0, xf= util.paper_setup_8_quads(True)
+        n_dims= [3]*8
+    elif n_agents==9:
+        x0, xf=util.paper_setup_9_quads(True)
+        x_dims= [3]*9
     elif n_agents == 10:
         x0,xf = util.paper_setup_10_quads(True)
         n_dims = [3]*10
