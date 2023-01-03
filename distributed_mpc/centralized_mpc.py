@@ -18,7 +18,7 @@ from util import (
 
 
 #Define constants for constraints
-
+centralized = True
 def solve_rhc(j_trial,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
              max_input,min_input,max_state,min_state):
     #N is the shifting prediction horizon
@@ -127,7 +127,7 @@ def solve_rhc(j_trial,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     logging.info(
     f'{j_trial},'
     f'{n_agents},{t},{failed_count},{converged},'
-    f'{objective_val},{N},{dt},'
+    f'{objective_val},{N},{dt},{radius},{centralized},'
         )
         
     return X_full,U_full, t, J_list, failed_count, converged

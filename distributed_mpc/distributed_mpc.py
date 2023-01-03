@@ -7,6 +7,7 @@ import logging
 import util
 from time import perf_counter
 
+centralized = False
 def solve_rhc_distributed(
     j_trial,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,\
     x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,\
@@ -285,7 +286,7 @@ def solve_rhc_distributed(
     logging.info(
         f'{j_trial},'
         f'{n_agents},{t},{failed_count},{converged},'
-        f'{objective_val},{N},{dt},"{ids}",{radius},'
+        f'{objective_val},{N},{dt},"{ids}",{radius},{centralized},'
     )
         
 
