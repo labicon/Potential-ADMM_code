@@ -19,12 +19,17 @@ def paper_setup_3_quads(random = False):
         xf[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
     return x0, xf
 
-def paper_setup_4_quads(random=False):
-    x0=np.random.uniform(-2, 2, size=(24, 1)).T
-    xf=np.random.uniform(-2, 2, size=(24, 1)).T
-    if random==True: 
-        x0[dec.pos_mask([6]*4, 3)]+= 0.05*np.random.randn(12, 1)
-        xf[dec.pos_mask([6]*4, 3)]+= 0.05*np.random.randn(12, 1)
+ 
+def paper_setup_4_quads():
+    
+    x0,xf = random_setup(4,6,n_d=3,energy=10,var=4/2)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
 
     return x0, xf
 
@@ -44,39 +49,54 @@ def paper_setup_5_quads(random = False):
     
     return x0,xf
 
-def paper_setup_6_quads(random = False):
-    x0=np.random.uniform(-2, 2, size=(36, 1)).T
-    xf=np.random.uniform(-2, 2, size=(36, 1)).T
-    if random==True: 
-        x0[dec.pos_mask([6]*6, 3)]+= 0.05*np.random.randn(18, 1)
-        xf[dec.pos_mask([6]*6, 3)]+=0.05*np.random.randn(18, 1)
+def paper_setup_6_quads():
+
+    x0,xf = random_setup(6,6,n_d=3,energy=10,var=6/2)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
 
     return x0, xf
 
 def paper_setup_7_quads(random=False):
-    x0=np.random.uniform(-2, 2, size=(42, 1)).T
-    xf=np.random.uniform(-2, 2, size=(42, 1)).T
-    if random==True:
-        x0[dec.pos_mask([6]*7, 3)]+= 0.05*np.random.rand(21, 1)
-        xf[dec.pos_mask([6]*7, 3)]+= 0.05*np.random.rand(21, 1)
+
+    x0,xf = random_setup(7,6,n_d=3,energy=10,var=7/2)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
 
     return x0, xf
 
 def paper_setup_8_quads(random=False):
-    x0=np.random.uniform(-2, 2, size=(48, 1)).T
-    xf=np.random.uniform(-2, 2, size=(48, 1)).T
-    if random==True:
-        x0[dec.pos_mask([6]*8, 3)]+= 0.05*np.random.rand(24, 1)
-        xf[dec.pos_mask([6]*8, 3)]+= 0.05*np.random.rand(24, 1)
+
+    x0,xf = random_setup(8,6,n_d=3,energy=10,var=8/2)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
 
     return x0, xf
 
 def paper_setup_9_quads(random=False):
-    x0=np.random.uniform(-2, 2, size=(54, 1)).T
-    xf=np.random.uniform(-2, 2, size=(54, 1)).T
-    if random==True: 
-        x0[dec.pos_mask([6]*9, 3)]+= 0.05*np.random.rand(27, 1)
-        xf[dec.pos_mask([6]*9, 3)]+= 0.05*np.random.rand(27, 1)
+    x0,xf = random_setup(9,6,n_d=3,energy=10,var=9/2)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
 
     return x0, xf
     
