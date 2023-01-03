@@ -20,8 +20,8 @@ def paper_setup_3_quads(random = False):
     return x0, xf
 
 def paper_setup_4_quads(random=False):
-    x0=np.random.rand(24, 1).T
-    xf=np.random.rand(24, 1).T
+    x0=np.random.uniform(-2, 2, size=(24, 1)).T
+    xf=np.random.uniform(-2, 2, size=(24, 1)).T
     if random==True: 
         x0[dec.pos_mask([6]*4, 3)]+= 0.05*np.random.randn(12, 1)
         xf[dec.pos_mask([6]*4, 3)]+= 0.05*np.random.randn(12, 1)
@@ -45,8 +45,8 @@ def paper_setup_5_quads(random = False):
     return x0,xf
 
 def paper_setup_6_quads(random = False):
-    x0=np.random.rand(36,1).T
-    xf=np.random.rand(36,1).T
+    x0=np.random.uniform(-2, 2, size=(36, 1)).T
+    xf=np.random.uniform(-2, 2, size=(36, 1)).T
     if random==True: 
         x0[dec.pos_mask([6]*6, 3)]+= 0.05*np.random.randn(18, 1)
         xf[dec.pos_mask([6]*6, 3)]+=0.05*np.random.randn(18, 1)
@@ -54,8 +54,8 @@ def paper_setup_6_quads(random = False):
     return x0, xf
 
 def paper_setup_7_quads(random=False):
-    x0=np.random.rand(42, 1).T
-    xf=np.random.rand(42, 1).T
+    x0=np.random.uniform(-2, 2, size=(42, 1)).T
+    xf=np.random.uniform(-2, 2, size=(42, 1)).T
     if random==True:
         x0[dec.pos_mask([6]*7, 3)]+= 0.05*np.random.rand(21, 1)
         xf[dec.pos_mask([6]*7, 3)]+= 0.05*np.random.rand(21, 1)
@@ -63,8 +63,8 @@ def paper_setup_7_quads(random=False):
     return x0, xf
 
 def paper_setup_8_quads(random=False):
-    x0=np.random.rand(48, 1).T
-    xf=np.random.rand(48, 1).T
+    x0=np.random.uniform(-2, 2, size=(48, 1)).T
+    xf=np.random.uniform(-2, 2, size=(48, 1)).T
     if random==True:
         x0[dec.pos_mask([6]*8, 3)]+= 0.05*np.random.rand(24, 1)
         xf[dec.pos_mask([6]*8, 3)]+= 0.05*np.random.rand(24, 1)
@@ -72,8 +72,8 @@ def paper_setup_8_quads(random=False):
     return x0, xf
 
 def paper_setup_9_quads(random=False):
-    x0=np.random.rand(54, 1).T
-    xf=np.random.rand(54, 1).T
+    x0=np.random.uniform(-2, 2, size=(54, 1)).T
+    xf=np.random.uniform(-2, 2, size=(54, 1)).T
     if random==True: 
         x0[dec.pos_mask([6]*9, 3)]+= 0.05*np.random.rand(27, 1)
         xf[dec.pos_mask([6]*9, 3)]+= 0.05*np.random.rand(27, 1)
