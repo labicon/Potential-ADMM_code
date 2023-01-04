@@ -19,10 +19,23 @@ def paper_setup_3_quads(random = False):
         xf[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
     return x0, xf
 
- 
-def paper_setup_4_quads():
+def setup_3_quads():
     
-    x0,xf = random_setup(4,6,n_d=3,energy=10,var=4/2)
+    x0,xf = random_setup(3,6,n_d=3,energy=3,var=3.0)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
+
+    return x0, xf
+
+ 
+def setup_4_quads():
+    
+    x0,xf = random_setup(4,6,n_d=3,energy=4,var=3.0)
     
     for i in range(2,len(x0),6):
         if x0[i] <= 0.5:
@@ -49,9 +62,23 @@ def paper_setup_5_quads(random = False):
     
     return x0,xf
 
-def paper_setup_6_quads():
 
-    x0,xf = random_setup(6,6,n_d=3,energy=10,var=6/2)
+def setup_5_quads():
+
+    x0,xf = random_setup(5,6,n_d=3,energy=5,var=3.0)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
+    
+    return x0,xf
+
+def setup_6_quads():
+
+    x0,xf = random_setup(6,6,n_d=3,energy=6,var=3.0)
     
     for i in range(2,len(x0),6):
         if x0[i] <= 0.5:
@@ -62,9 +89,9 @@ def paper_setup_6_quads():
 
     return x0, xf
 
-def paper_setup_7_quads(random=False):
+def setup_7_quads():
 
-    x0,xf = random_setup(7,6,n_d=3,energy=10,var=7/2)
+    x0,xf = random_setup(7,6,n_d=3,energy=7,var=3.0)
     
     for i in range(2,len(x0),6):
         if x0[i] <= 0.5:
@@ -75,9 +102,9 @@ def paper_setup_7_quads(random=False):
 
     return x0, xf
 
-def paper_setup_8_quads(random=False):
+def setup_8_quads():
 
-    x0,xf = random_setup(8,6,n_d=3,energy=10,var=8/2)
+    x0,xf = random_setup(8,6,n_d=3,energy=8,var=3.0)
     
     for i in range(2,len(x0),6):
         if x0[i] <= 0.5:
@@ -88,8 +115,8 @@ def paper_setup_8_quads(random=False):
 
     return x0, xf
 
-def paper_setup_9_quads(random=False):
-    x0,xf = random_setup(9,6,n_d=3,energy=10,var=9/2)
+def setup_9_quads():
+    x0,xf = random_setup(9,6,n_d=3,energy=8,var=3.0)
     
     for i in range(2,len(x0),6):
         if x0[i] <= 0.5:
@@ -99,6 +126,20 @@ def paper_setup_9_quads(random=False):
             xf[i] = 1.1 + np.random.rand(1,)*0.5
 
     return x0, xf
+
+def setup_10_quads():
+    
+    x0,xf = random_setup(10,6,n_d=3,energy=8,var=3.0)
+    
+    for i in range(2,len(x0),6):
+        if x0[i] <= 0.5:
+            x0[i] = 1.2 + np.random.rand(1,)
+
+        if xf[i] <= 0.5:
+            xf[i] = 1.1 + np.random.rand(1,)*0.5
+
+    return x0, xf
+
     
     
 def paper_setup_10_quads(random = False):

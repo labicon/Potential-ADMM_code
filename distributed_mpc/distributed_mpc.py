@@ -19,7 +19,7 @@ def solve_rhc_distributed(
     p_opts = {"expand": True}
     s_opts = {"max_iter": 200, "print_level": 0}
 
-    M = 150  # this is the maximum number of outer iterations
+    M = 50  # this is the maximum number of outer iterations
     
     n_x = n_agents * n_states
     # n_u = n_agents * n_inputs
@@ -43,6 +43,7 @@ def solve_rhc_distributed(
     else:
         id_humans = None
     
+    t_solve_start = perf_counter()
     while np.any(distance_to_goal(x0, xf, n_agents, n_states) > 0.1) and (loop < M):
 
         ######################################################################
@@ -225,6 +226,8 @@ def solve_rhc_distributed(
 
             di.solver("ipopt", p_opts, s_opts)
             
+            t_solve = None
+
             try:
                 
                 sol = di.solve()
@@ -234,6 +237,7 @@ def solve_rhc_distributed(
                 failed_count +=1
                 # return X_full, U_full, t, J_list, failed_count, converged
                 break
+          
             
             objective_val += sol.value(costi)
             print(
@@ -280,13 +284,14 @@ def solve_rhc_distributed(
         if np.all(distance_to_goal(x0, xf, n_agents, n_states) <= 0.1):
             converged = True
             print(f"Terminated! at loop = {loop}, converged is {converged} \n")
-
+            t_solve_end = perf_counter()
+            t_solve = t_solve_end-t_solve_start
             break
-
+        
     logging.info(
         f'{j_trial},'
         f'{n_agents},{t},{failed_count},{converged},'
-        f'{objective_val},{N},{dt},"{ids}",{radius},{centralized},'
+        f'{objective_val},{N},{dt},"{ids}",{radius},{centralized},{t_solve},'
     )
         
 

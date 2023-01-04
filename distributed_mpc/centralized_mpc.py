@@ -3,6 +3,7 @@ import numpy as np
 from scipy.constants import g
 from casadi import *
 import logging
+from time import perf_counter
 
 from util import (
     compute_pairwise_distance,
@@ -45,6 +46,8 @@ def solve_rhc(j_trial,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     dt = 0.1
     failed_count = 0
     converged = False
+
+    t_solve_start = perf_counter()
     while np.any(distance_to_goal(x0,xf,n_agents,n_states) > 0.1)  and (i < M):
         
         
@@ -90,23 +93,31 @@ def solve_rhc(j_trial,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         
         opti.solver("ipopt",p_opts,
                     s_opts) 
-        
+        t_solve = None
         try:
             sol = opti.solve()
             
         except RuntimeError:
             print('Current problem is infeasible \n')
             failed_count +=1
+            objective_val = None
+            logging.info(
+            f'{j_trial},'
+            f'{n_agents},{t},{failed_count},{converged},'
+            f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},'
+                )
+        
             return X_full,U_full, t, J_list, failed_count, converged
+            # break
             
             
         # print(opti.debug.value)
         x0 = sol.value(X)[:,1].reshape(-1,1)
         # print(x0.shape)
         u_sol = sol.value(U)[:,0]
-        
-        J_list.append(sol.value(cost_fun))
-        print(f'current objective function value is {sol.value(cost_fun)}')
+        objective_val = sol.value(cost_fun)
+        J_list.append(objective_val)
+        print(f'current objective function value is {objective_val}')
          
         
         #Store the trajectory
@@ -121,13 +132,14 @@ def solve_rhc(j_trial,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         if np.all(distance_to_goal(x0, xf, n_agents, n_states) <= 0.1):
             converged = True
             print(f"Terminated! at loop = {i}, converged is {converged}")
-
+            t_solve_end = perf_counter()
+            t_solve = t_solve_end-t_solve_start
             break
             
     logging.info(
     f'{j_trial},'
     f'{n_agents},{t},{failed_count},{converged},'
-    f'{objective_val},{N},{dt},{radius},{centralized},'
+    f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},'
         )
         
     return X_full,U_full, t, J_list, failed_count, converged

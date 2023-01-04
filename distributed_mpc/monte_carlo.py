@@ -47,7 +47,7 @@ y_min = -5
 y_max = 5
 
 z_min = 0
-z_max = 3.5
+z_max = 4.0
 
 u_ref_base = np.array([0,0,g])
 
@@ -56,8 +56,6 @@ min_input_base = np.array([[theta_min], [phi_min], [tau_min]])
 max_state_base = np.array([[x_max], [y_max], [z_max], [v_max],[v_max], [v_max]])
 min_state_base = np.array([[x_min], [y_min], [z_min], [v_min],[v_min], [v_min]])
 
-radius = 0.5
-N = 15
 n_states = 6
 n_inputs = 3
 
@@ -66,36 +64,36 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
     """Single simulation comparing the centralized and decentralized solvers"""
     
     if n_agents == 3:
-        x0,xf = util.paper_setup_3_quads(True)
+        x0,xf = util.setup_3_quads()
         n_dims = [3]*3
+
     elif n_agents==4:
-        x0, xf=util.paper_setup_4_quads()
+        x0, xf=util.setup_4_quads()
         n_dims=[3]*4
+
     elif n_agents == 5:
-        x0,xf = util.paper_setup_5_quads(True)
+        x0,xf = util.setup_5_quads()
         n_dims = [3]*5
+
     elif n_agents==6:
-        x0, xf=util.paper_setup_6_quads()
+        x0, xf=util.setup_6_quads()
         n_dims= [3]*6
+
     elif n_agents==7:
-        x0, xf=util.paper_setup_7_quads()
+        x0, xf=util.setup_7_quads()
         n_dims= [3]*7
+
     elif n_agents==8:
-        x0, xf= util.paper_setup_8_quads()
+        x0, xf= util.setup_8_quads()
         n_dims= [3]*8
+
     elif n_agents==9:
-        x0, xf=util.paper_setup_9_quads()
-        x_dims= [3]*9
+        x0, xf=util.setup_9_quads()
+        n_dims= [3]*9
+
     elif n_agents == 10:
-        x0,xf = util.paper_setup_10_quads(True)
+        x0,xf = util.setup_10_quads()
         n_dims = [3]*10
-    elif n_agents == 15:
-        x0,xf = util.paper_setup_15_quads()
-        n_dims = [3]*15
-    elif n_agents == 20:
-        x0,xf = util.paper_setup_20_quads()
-        n_dims = [3]*20
-        
     
     ids = [100 + i for i in range(n_agents)]
     
@@ -150,7 +148,7 @@ def setup_logger(centralized=False):
         print(f"Logging results to {LOG_FILE}")
         logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
         logging.info(
-            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,radius,centralized"
+            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,radius,centralized,t_solve"
         )
         
     else:
@@ -164,7 +162,7 @@ def setup_logger(centralized=False):
         print(f"Logging results to {LOG_FILE}")
         logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
         logging.info(
-            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,ids,radius,centralized"
+            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,ids,radius,centralized,t_solve"
         )
 
 def monte_carlo_analysis():
@@ -173,20 +171,22 @@ def monte_carlo_analysis():
     setup_logger()
 
     n_trials_iter = range(30)
-    # n_agents_iter =[10,15]
-    # n_agents_iter = [3, 5, 10]
-    # n_agents_iter = [10, 15, 20] 
+    # n_agents_iter =[9,10]
+    # n_agents_iter = [3,4,5,6,7,8,9,10]
     n_agents_iter = [4,5,6,7,8,9,10]
     dt = 0.1
     N = 10
-    radius = 0.5
+    radius = 0.4
     
     # Change the for loops into multi-processing?
 
     for n_agents in n_agents_iter:
         print(f"\tn_agents: {n_agents}")
-        if n_agents >=5 and n_agents <=10:
+        if n_agents >=5 and n_agents <=8:
             radius = 0.25
+        
+        if n_agents >8 and n_agents <=10:
+            radius = 0.2
             
         if n_agents > 10:
             radius = 0.1
@@ -196,7 +196,7 @@ def monte_carlo_analysis():
             
             multi_agent_run(
                 i_trial, n_agents, dt, N, radius, \
-                 centralized=False)
+                 centralized=True)
           
     
 def main():
