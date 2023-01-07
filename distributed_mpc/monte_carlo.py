@@ -115,24 +115,24 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
         print("\t\t\tcentralized")
         
 
-        Xc, Uc, tc , J_c, failed_count, converged = solve_rhc(trial,x0,xf,u_ref,
+        Xc, Uc, tc , J_c, failed_count, converged = solve_rhc(x0,xf,u_ref,
                                N,Q,R,Qf,n_agents,
                                n_states,n_inputs,
                                radius,max_input,
                                min_input,max_state,
-                               min_state)
+                               min_state,trial)
 
         
     else:
         print("\t\t\tdistributed")
-
+        #no humans are involved in the monte carlo simulations
         Xd, Ud, td, J_d , failed_count, converged = solve_rhc_distributed(
-                trial,x0, xf, u_ref, N,  
+                x0, xf, u_ref, N,  
                 n_agents, n_states, n_inputs, radius, ids,
                 x_min,x_max,y_min,y_max,z_min,z_max,v_min,
                 v_max,theta_max,
                 theta_min,tau_max,
-                tau_min,phi_max,phi_min,0,n_dims
+                tau_min,phi_max,phi_min,0,n_dims,trial
                                 )
 
 def setup_logger(centralized=False):

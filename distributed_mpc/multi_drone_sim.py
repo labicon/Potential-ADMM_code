@@ -122,7 +122,7 @@ if __name__ == "__main__" :
         
     if centralized:
         file_name = f'{n_agents}_drones_centralized_sim_data'
-        X_full,U_full, t, J_list, failed_count, converged = solve_rhc(0,x0,xf,u_ref,N,Q,R,Qf,                                                                      n_agents,n_states,n_inputs,radius,
+        X_full,U_full, t, J_list, failed_count, converged = solve_rhc(x0,xf,u_ref,N,Q,R,Qf,                                                                      n_agents,n_states,n_inputs,radius,
         max_input,min_input,max_state,min_state)
   
     if not centralized:
@@ -138,7 +138,7 @@ if __name__ == "__main__" :
             file_name = f'{n_agents}_drones_distributed_sim_data'
             ids =  [100 + i for i in range(n_agents)]
             X_full, U_full, t, J_list, failed_count, converged = solve_rhc_distributed(
-                                            0,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
+                                            x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
                                             x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
                                               theta_min,tau_max,tau_min,phi_max,phi_min,n_human_agents,n_dims
                                                 )

@@ -20,8 +20,8 @@ from util import (
 
 #Define constants for constraints
 centralized = True
-def solve_rhc(j_trial,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
-             max_input,min_input,max_state,min_state):
+def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
+             max_input,min_input,max_state,min_state,j_trial=None):
     #N is the shifting prediction horizon
     
     p_opts = {"expand":True}
