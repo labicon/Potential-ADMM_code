@@ -207,3 +207,5 @@ i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,ids,radius,centrali
 25,10,0,1,False,None,10,0.1,0.2,True,None,
 26,10,0,1,False,None,10,0.1,0.2,True,None,
 27,10,0,1,False,None,10,0.1,0.2,True,None,
+28,10,2.9000000000000012,0,True,59.761089950108214,10,0.1,0.2,True,90.81337430002168,
+29,10,0,1,False,None,10,0.1,0.2,True,None,
