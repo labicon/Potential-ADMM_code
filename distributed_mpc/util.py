@@ -232,14 +232,11 @@ def generate_f_human_drone(x_dims_local,n_human):
                 x[i_xstart + 3: i_xstart + 6],
                 g*cs.tan(u[i_ustart]), -g*cs.tan(u[i_ustart+1]), u[i_ustart+2] - g
                 )
-        count = 0
+        # count = 0
         for j_agent in range(n_agents-n_human,n_agents):
             j_xstart = j_agent * n_states
-            j_ustart = j_agent * n_controls #human agent has 2 control var.
-            if count > 0:
-                j_ustart -=1
-            count +=1
-            
+            j_ustart = j_agent * n_controls #human agent has 3 control var.
+       
             x_dot[j_xstart:j_xstart + n_states] = cs.vertcat(
                 x[j_xstart + 3]*cs.cos(u[j_ustart]), x[j_xstart+3]*cs.sin(u[j_ustart]),0,
                 u[j_ustart+1], 0 , 0
