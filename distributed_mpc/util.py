@@ -78,7 +78,7 @@ def setup_5_quads():
 
 def setup_6_quads():
 
-    x0,xf = random_setup(6,6,n_d=3,energy=6,var=3.0)
+    x0,xf = random_setup(6,6,n_d=3,energy=5,var=2.5)
     
     for i in range(2,len(x0),6):
         if x0[i] <= 0.5:

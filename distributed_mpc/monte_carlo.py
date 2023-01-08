@@ -171,9 +171,11 @@ def monte_carlo_analysis():
     setup_logger()
 
     n_trials_iter = range(30)
-    # n_agents_iter =[9,10]
-    # n_agents_iter = [3,4,5,6,7,8,9,10]
-    n_agents_iter = [4,5,6,7,8,9,10]
+
+    n_agents_iter = [3,4,5,6,7,8,9,10]
+    #Note: somehow with 6 drones the centralized simulation does not converge even once!
+
+    # n_agents_iter = [6]
     dt = 0.1
     N = 10
     radius = 0.4
