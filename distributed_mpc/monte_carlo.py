@@ -23,7 +23,7 @@ import numpy as np
 
 from util import *
 import util
-from decentralized import random_setup
+from dpilqr import random_setup
 from distributed_mpc import *
 from centralized_mpc import *
 
@@ -198,7 +198,7 @@ def monte_carlo_analysis():
             
             multi_agent_run(
                 i_trial, n_agents, dt, N, radius, \
-                 centralized=True)
+                 centralized=False)
           
     
 def main():

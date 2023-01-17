@@ -2,8 +2,8 @@ import numpy as np
 import itertools
 from casadi import *
 import casadi as cs
-import decentralized as dec
-from decentralized import random_setup
+import dpilqr
+from dpilqr import random_setup
 
 def paper_setup_3_quads(random = False):
     
@@ -15,8 +15,8 @@ def paper_setup_3_quads(random = False):
                     0.5, 1.5, 1, 0, 0, 0, 
                     1.5, 2.2, 1, 0, 0, 0]]).T
     if random == True:
-        x0[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
-        xf[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
+        x0[dpilqr.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
+        xf[dpilqr.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
     return x0, xf
 
 def setup_3_quads():
@@ -57,8 +57,8 @@ def paper_setup_5_quads(random = False):
          0.   ,  0.   ,  0.34 , -0.993, 0.93,  0.   ,  0.   ,  0.   ,
          1.094,  0.237,  1.5,  0.   ,  0.   ,  0.   ]]).T
     if random == True:
-        x0[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
-        xf[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
+        x0[dpilqr.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
+        xf[dpilqr.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
     
     return x0,xf
 
@@ -163,8 +163,8 @@ def paper_setup_10_quads(random = False):
     
     if random == True:
         
-        x0[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
-        xf[dec.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
+        x0[dpilqr.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
+        xf[dpilqr.pos_mask([6]*10, 3)] += 0.01*np.random.randn(30, 1)
 
     return x0,xf
 

@@ -166,16 +166,16 @@ def solve_rhc_distributed(
             x_dims_local = [int(n_states)] * int(n_states_local / n_states)
         
             print(f"current sub-problem has state dimension : {x_dims_local} \n")
-            # if n_humans !=0:
-            if any(item in ids_ for item in id_humans):
-                    
-                human_count = sum(item in ids_ for item in id_humans)
-                drones_count = len(x_dims_local)-human_count
-                #print(f'{human_count} human agents are detected in the sub problem')
-                n_dims_local = [3]*drones_count
-                n_dims_local+= [2]*2
-                print('n_dims is {n_dims_local}')
-                f = generate_f_human_drone(x_dims_local,human_count)
+            if n_humans !=0:
+                #print(id_humans, "id_humans")
+                if any(item in ids_ for item in id_humans):
+                    human_count = sum(item in ids_ for item in id_humans)
+                    drones_count = len(x_dims_local)-human_count
+                    #print(f'{human_count} human agents are detected in the sub problem')
+                    n_dims_local = [3]*drones_count
+                    n_dims_local+= [2]*2
+                    print('n_dims is {n_dims_local}')
+                    f = generate_f_human_drone(x_dims_local,human_count)
             else:
                 f = generate_f(x_dims_local)
                 drones_count = len(x_dims_local)
