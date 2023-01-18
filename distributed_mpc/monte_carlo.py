@@ -197,8 +197,8 @@ def monte_carlo_analysis():
             print(f"\t\ttrial: {i_trial}")
             
             multi_agent_run(
-                i_trial, n_agents, dt, N, radius, \
-                 centralized=True)
+                i_trial, n_agents, dt, N, radius, 
+                 centralized=False)
           
     
 def main():

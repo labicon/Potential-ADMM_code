@@ -131,6 +131,7 @@ def solve_rhc_distributed(
         X_dec = np.zeros((1, n_x))
         U_dec = np.zeros((1, n_u))
         
+        
         for (
             di,
             statesi,
@@ -166,16 +167,16 @@ def solve_rhc_distributed(
             x_dims_local = [int(n_states)] * int(n_states_local / n_states)
         
             print(f"current sub-problem has state dimension : {x_dims_local} \n")
-            # if n_humans !=0:
-            if any(item in ids_ for item in id_humans):
+            if n_humans !=0:
+                if any(item in ids_ for item in id_humans):
                     
-                human_count = sum(item in ids_ for item in id_humans)
-                drones_count = len(x_dims_local)-human_count
-                #print(f'{human_count} human agents are detected in the sub problem')
-                n_dims_local = [3]*drones_count
-                n_dims_local+= [2]*2
-                print('n_dims is {n_dims_local}')
-                f = generate_f_human_drone(x_dims_local,human_count)
+                    human_count = sum(item in ids_ for item in id_humans)
+                    drones_count = len(x_dims_local)-human_count
+                    #print(f'{human_count} human agents are detected in the sub problem')
+                    n_dims_local = [3]*drones_count
+                    n_dims_local+= [2]*2
+                    print('n_dims is {n_dims_local}')
+                    f = generate_f_human_drone(x_dims_local,human_count)
             else:
                 f = generate_f(x_dims_local)
                 drones_count = len(x_dims_local)
@@ -228,19 +229,16 @@ def solve_rhc_distributed(
 
             di.solver("ipopt", p_opts, s_opts)
             
-            t_solve = None
-
+            
             try:
-                
-                sol = di.solve()
-                
+                sol = di.solve()                               
             except RuntimeError:
+                t_solve = None
                 print('Current problem is infeasible')
                 failed_count +=1
                 # return X_full, U_full, t, J_list, failed_count, converged
                 break
           
-            
             objective_val += sol.value(costi)
             print(
                 f"objective value for the {count}th subproblem at iteration {loop} is {sol.value(costi)} \n"
@@ -261,7 +259,6 @@ def solve_rhc_distributed(
                 i_prob * n_inputs : (i_prob + 1) * n_inputs
             ]
 
-     
         x0 = X_dec.reshape(-1, 1)
         print(f"current collected solution is {x0.T} \n")
 

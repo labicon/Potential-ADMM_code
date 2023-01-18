@@ -47,6 +47,7 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     failed_count = 0
     converged = False
 
+    
     t_solve_start = perf_counter()
     while np.any(distance_to_goal(x0,xf,n_agents,n_states) > 0.1)  and (i < M):
         
@@ -93,11 +94,13 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         
         opti.solver("ipopt",p_opts,
                     s_opts) 
-        t_solve = None
+        
         try:
+            
             sol = opti.solve()
             
         except RuntimeError:
+            t_solve = None
             print('Current problem is infeasible \n')
             failed_count +=1
             objective_val = None
@@ -109,7 +112,7 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         
             return X_full,U_full, t, J_list, failed_count, converged
             # break
-            
+      
             
         # print(opti.debug.value)
         x0 = sol.value(X)[:,1].reshape(-1,1)
