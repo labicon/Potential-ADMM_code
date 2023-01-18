@@ -170,7 +170,10 @@ def monte_carlo_analysis():
 
     setup_logger()
 
-    n_trials_iter = range(30)
+    # n_trials_iter = range(30)
+
+    #For code profiling:
+    n_trials_iter = range(2)
 
     n_agents_iter = [3,4,5,6,7,8,9,10]
     #Note: somehow with 6 drones the centralized simulation does not converge even once!

@@ -229,9 +229,12 @@ def solve_rhc_distributed(
 
             di.solver("ipopt", p_opts, s_opts)
             
-            
+            t0 = perf_counter()
             try:
-                sol = di.solve()                               
+                sol = di.solve()
+                tf = perf_counter()
+                print(f'solve time for the current sub-problem is {tf-t0} \n')
+
             except RuntimeError:
                 t_solve = None
                 print('Current problem is infeasible')
