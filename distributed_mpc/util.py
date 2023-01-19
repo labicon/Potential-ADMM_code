@@ -2,8 +2,30 @@ import numpy as np
 import itertools
 from casadi import *
 import casadi as cs
-import decentralized as dec
-from decentralized import random_setup
+import dpilqr as dec
+from dpilqr import random_setup
+
+
+def paper_setup_3_quads_2_humans(random=False):
+    
+    x0 = np.array([[0.5, 1.5, 1, 0, 0, 0,
+                    2.5, 1.5, 1, 0, 0, 0,
+                    1.5, 1.3, 1, 0, 0, 0,
+                    -2, -2, 1.7, 0, 0, 0
+                    2, 2, 1.7, 0, 0, 0]], 
+                     dtype=float).T
+    xf = np.array([[2.5, 1.5, 1, 0, 0, 0, 
+                    0.5, 1.5, 1, 0, 0, 0, 
+                    1.5, 2.2, 1, 0, 0, 0]]).T
+    if random == True:
+        x0[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
+        xf[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
+    return x0, xf
+    
+
+
+
+
 
 def paper_setup_3_quads(random = False):
     
@@ -47,15 +69,28 @@ def setup_4_quads():
     return x0, xf
 
 def paper_setup_5_quads(random = False):
-    x0 = np.array([[-0.182, -0.545,  1.161,  0.   ,  0.   ,  0.   ,  1.335,  1.484,
-         0.5  ,  0.   ,  0.   ,  0.   , -0.97 , -0.831,  2.295,  0.   ,
-         0.   ,  0.   , -1.144, -1.193,  1.7  ,  0.   ,  0.   ,  0.   ,
-         0.961,  1.085,  0.88 ,  0.   ,  0.   ,  0.   ]]).T
+#     x0 = np.array([[-0.182, -0.545,  1.161,  0.   ,  0.   ,  0.   ,  1.335,  1.484,
+#          0.5  ,  0.   ,  0.   ,  0.   , -0.97 , -0.831,  2.295,  0.   ,
+#          0.   ,  0.   , -1.144, -1.193,  1.7  ,  0.   ,  0.   ,  0.   ,
+#          0.961,  1.085,  0.88 ,  0.   ,  0.   ,  0.   ]]).T
     
-    xf =  np.array([[-1.751,  0.674, 1.193,  0.   ,  0.   ,  0.   ,  1.769,  0.102,
-         2.998,  0.   ,  0.   ,  0.   , -1.452, -0.02 , 1.11 ,  0.   ,
-         0.   ,  0.   ,  0.34 , -0.993, 0.93,  0.   ,  0.   ,  0.   ,
-         1.094,  0.237,  1.5,  0.   ,  0.   ,  0.   ]]).T
+#     xf =  np.array([[-1.751,  0.674, 1.193,  0.   ,  0.   ,  0.   ,  1.769,  0.102,
+#          2.998,  0.   ,  0.   ,  0.   , -1.452, -0.02 , 1.11 ,  0.   ,
+#          0.   ,  0.   ,  0.34 , -0.993, 0.93,  0.   ,  0.   ,  0.   ,
+#          1.094,  0.237,  1.5,  0.   ,  0.   ,  0.   ]]).T
+
+    x0 = np.array([[0.5, 1.5, 1, 0, 0, 0,
+                    2.5, 1.5, 1, 0, 0, 0,
+                    1.5, 1.3, 1, 0, 0, 0,
+                    -0.5 ,0.5, 1, 0, 0, 0,
+                   1.1, 1.1, 1, 0, 0, 0]], 
+                     dtype=float).T
+    xf = np.array([[2.5, 1.5, 1, 0, 0, 0, 
+                    0.5, 1.5, 1, 0, 0, 0, 
+                    1.5, 2.2, 1, 0, 0, 0,
+                   -0.5, 1.5, 1, 0, 0, 0,
+                   -1.1, 1.1, 1, 0, 0, 0]]).T
+
     if random == True:
         x0[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
         xf[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
