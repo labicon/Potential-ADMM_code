@@ -45,7 +45,7 @@ def solve_rhc_distributed(
         id_humans = None
     
     t_solve_start = perf_counter()
-    while np.any(distance_to_goal(x0, xf, n_agents, n_states) > 0.1) and (loop < M):
+    while not np.all(distance_to_goal(x0, xf, n_agents, n_states) <= 0.1) and (loop < M):
 
         ######################################################################
         # Determine sub problems to solve:

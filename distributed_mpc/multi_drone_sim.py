@@ -30,14 +30,14 @@ y_min = -5
 y_max = 5
 
 z_min = 0
-z_max = 3.5
+z_max = 3.0
 
 max_input_base = np.array([[theta_max], [phi_max], [tau_max]])
 min_input_base = np.array([[theta_min], [phi_min], [tau_min]])
 max_state_base = np.array([[x_max], [y_max], [z_max], [v_max],[v_max], [v_max]])
-min_state_base = np.array([[x_min], [y_min], [z_min], [v_min],[v_min], [v_min]])
+min_state_base = np.array([[x_min], [y_min], [z_min], [v_min],[v_min],[v_min]])
 
-radius = 0.5
+radius = 0.35
 N = 15
 n_states = 6
 n_inputs = 3
@@ -49,6 +49,10 @@ if __name__ == "__main__" :
     
     print("Choose the number of agents (3,5, 10 or 15):")
     n_agents = int(input())
+    max_input = np.tile(max_input_base,(n_agents,1))
+    min_input = np.tile(min_input_base,(n_agents,1))
+    max_state = np.tile(max_state_base,(n_agents,1))
+    min_state = np.tile(min_state_base,(n_agents,1))
     
     print("Choose the number of human agents (0, 1,2, or 3): ")
     n_human_agents = int(input())
@@ -66,10 +70,7 @@ if __name__ == "__main__" :
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
         n_dims = [3]*3
-        max_input = np.tile(max_input_base,n_agents)
-        min_input = np.tile(min_input_base,n_agents)
-        max_state = np.tile(max_state_base,n_agents)
-        min_state = np.tile(min_state_base,n_agents)
+        
         
         
     elif n_agents == 5:
@@ -80,11 +81,7 @@ if __name__ == "__main__" :
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
         n_dims = [3]*5
-        max_input = np.tile(max_input_base,n_agents)
-        min_input = np.tile(min_input_base,n_agents)
-        max_state = np.tile(max_state_base,n_agents)
-        min_state = np.tile(min_state_base,n_agents)
-
+        
     elif n_agents == 10:
         x0,xf = util.paper_setup_10_quads()
         radius = 0.3
@@ -96,10 +93,7 @@ if __name__ == "__main__" :
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
         n_dims = [3]*10
-        max_input = np.tile(max_input_base,n_agents)
-        min_input = np.tile(min_input_base,n_agents)
-        max_state = np.tile(max_state_base,n_agents)
-        min_state = np.tile(min_state_base,n_agents)
+     
         
     elif n_agents == 15:
         x0,xf = util.paper_setup_15_quads()
@@ -115,10 +109,7 @@ if __name__ == "__main__" :
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
         n_dims = [3]*15
-        max_input = np.tile(max_input_base,n_agents)
-        min_input = np.tile(min_input_base,n_agents)
-        max_state = np.tile(max_state_base,n_agents)
-        min_state = np.tile(min_state_base,n_agents)
+     
         
     if centralized:
         file_name = f'{n_agents}_drones_centralized_sim_data'

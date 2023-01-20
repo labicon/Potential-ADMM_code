@@ -43,13 +43,13 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     J_list.append(np.inf)
     # for i in range(M) :
     i = 0
-    dt = 0.1
+    dt = 0.05
     failed_count = 0
     converged = False
 
     
     t_solve_start = perf_counter()
-    while np.any(distance_to_goal(x0,xf,n_agents,n_states) > 0.1)  and (i < M):
+    while not np.all(distance_to_goal(x0,xf,n_agents,n_states) <= 0.1)  and (i < M):
         
         
         opti = Opti()
@@ -72,9 +72,9 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
             
             #Constraints on inputs:
             for j in range(max_input.shape[0]):
-                # print(U[j,k].shape,max_input[j].shape)
                 opti.subject_to(U[j,k] <= max_input[j] )
                 opti.subject_to(min_input[j] <= U[j,k] )
+
 
         #collision avoidance constraints
         for k in range(N+1):
@@ -87,7 +87,6 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
 
                 opti.subject_to(X[m,k]<= max_state[m] )
                 opti.subject_to(min_state[m] <= X[m,k])
-
             
         #equality constraints for initial condition:
         opti.subject_to(X[:,0] == x0)
