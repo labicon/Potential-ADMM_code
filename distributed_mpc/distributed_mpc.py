@@ -10,7 +10,7 @@ from time import perf_counter
 centralized = False
 
 def solve_rhc_distributed(
-    x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,\
+    dt,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,\
     x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,\
   theta_min,tau_max,tau_min,phi_max,phi_min,n_humans,n_dims=None,j_trial=None):
 
@@ -31,7 +31,7 @@ def solve_rhc_distributed(
     J_list.append(np.inf)
     # for i in range(M) :
     loop = 0
-    dt = 0.1
+ 
 
     X_full = np.zeros((0, n_x))
     U_full = np.zeros((0, n_u))

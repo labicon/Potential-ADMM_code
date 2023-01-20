@@ -23,7 +23,7 @@ import numpy as np
 
 from util import *
 import util
-from decentralized import random_setup
+from dpilqr import random_setup
 from distributed_mpc import *
 from centralized_mpc import *
 
@@ -114,20 +114,20 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
     if centralized == True:
         print("\t\t\tcentralized")
         
-
-        Xc, Uc, tc , J_c, failed_count, converged = solve_rhc(x0,xf,u_ref,
+        
+        Xc, Uc, tc , J_c, failed_count, converged = solve_rhc(dt,x0,xf,u_ref,
                                N,Q,R,Qf,n_agents,
                                n_states,n_inputs,
                                radius,max_input,
                                min_input,max_state,
-                               min_state,trial)
+                               min_state,0,trial)
 
         
     else:
         print("\t\t\tdistributed")
         #no humans are involved in the monte carlo simulations
         Xd, Ud, td, J_d , failed_count, converged = solve_rhc_distributed(
-                x0, xf, u_ref, N,  
+                dt,x0, xf, u_ref, N,  
                 n_agents, n_states, n_inputs, radius, ids,
                 x_min,x_max,y_min,y_max,z_min,z_max,v_min,
                 v_max,theta_max,
@@ -170,15 +170,11 @@ def monte_carlo_analysis():
 
     setup_logger()
 
-    # n_trials_iter = range(30)
-
-    #For code profiling:
-    n_trials_iter = range(2)
+    n_trials_iter = range(30)
 
     n_agents_iter = [3,4,5,6,7,8,9,10]
     #Note: somehow with 6 drones the centralized simulation does not converge even once!
 
-    # n_agents_iter = [6]
     dt = 0.1
     N = 10
     radius = 0.4
@@ -201,7 +197,7 @@ def monte_carlo_analysis():
             
             multi_agent_run(
                 i_trial, n_agents, dt, N, radius, 
-                 centralized=False)
+                 centralized=True)
           
     
 def main():

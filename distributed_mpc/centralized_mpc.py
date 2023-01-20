@@ -21,12 +21,12 @@ from util import (
 
 #Define constants for constraints
 centralized = True
-def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
+def solve_rhc(dt,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
              max_input,min_input,max_state,min_state,n_humans,j_trial=None):
     #N is the shifting prediction horizon
     
     p_opts = {"expand":True}
-    s_opts = {"max_iter": 1000,"print_level":0}
+    s_opts = {"max_iter": 200,"print_level":0}
     
     
     M = 100  # this is the maximum number of outer iterations
@@ -49,13 +49,13 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     J_list.append(np.inf)
     # for i in range(M) :
     i = 0
-    dt = 0.05
+
     failed_count = 0
     converged = False
 
     
     t_solve_start = perf_counter()
-    while not np.all(distance_to_goal(x0,xf,n_agents,n_states) <= 0.1)  and (i < M):
+    while not np.all(distance_to_goal(x0,xf,n_agents,n_states) < 0.1)  and (i < M):
         
         
         opti = Opti()
@@ -126,9 +126,9 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
             # break
       
             
-        # print(opti.debug.value)
+
         x0 = sol.value(X)[:,1].reshape(-1,1)
-        # print(x0.shape)
+
         u_sol = sol.value(U)[:,0]
         objective_val = sol.value(cost_fun)
         J_list.append(objective_val)
@@ -147,17 +147,18 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         if np.all(distance_to_goal(x0, xf, n_agents, n_states) <= 0.1):
             converged = True
             print(f"Terminated! at loop = {i}, converged is {converged}")
-            t_solve_end = perf_counter()
-            t_solve = t_solve_end-t_solve_start
-            
-            logging.info(
-            f'{j_trial},'
-            f'{n_agents},{t},{failed_count},{converged},'
-            f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},'
-                )
-            
             break
             
+    t_solve_end = perf_counter()
+    t_solve = t_solve_end-t_solve_start
+
+            
+            
+    logging.info(
+    f'{j_trial},'
+    f'{n_agents},{t},{failed_count},{converged},'
+    f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},'
+        )
     
         
     return X_full,U_full, t, J_list, failed_count, converged
