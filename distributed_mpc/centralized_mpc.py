@@ -12,6 +12,7 @@ from util import (
     distance_to_goal,
     split_graph, 
     generate_f,
+    generate_f_human_drone,
     objective,
     generate_min_max_input,
     generate_min_max_state
@@ -21,7 +22,7 @@ from util import (
 #Define constants for constraints
 centralized = True
 def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
-             max_input,min_input,max_state,min_state,j_trial=None):
+             max_input,min_input,max_state,min_state,n_humans,j_trial=None):
     #N is the shifting prediction horizon
     
     p_opts = {"expand":True}
@@ -33,7 +34,12 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     n_x = n_agents*n_states
     n_u = n_agents*n_inputs
     x_dims = [n_states]*n_agents
-    f = generate_f(x_dims)
+   
+    if n_humans!=0:
+        f = generate_f_human_drone(x_dims,n_humans)
+    else:
+        f = generate_f(x_dims)
+            
     X_full = np.zeros((0, n_x))
     U_full = np.zeros((0, n_u))
     
@@ -72,8 +78,12 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
             
             #Constraints on inputs:
             for j in range(max_input.shape[0]):
-                opti.subject_to(U[j,k] <= max_input[j] )
-                opti.subject_to(min_input[j] <= U[j,k] )
+                if n_humans!=0:
+                    opti.subject_to(U[0:(n_agents-n_humans)*n_inputs,k] <= max_input )
+                    opti.subject_to(min_input <= U[0:(n_agents-n_humans)*n_inputs,k] )
+                else:
+                    opti.subject_to(U[j,k] <= max_input[j] )
+                    opti.subject_to(min_input[j] <= U[j,k] )
 
 
         #collision avoidance constraints
@@ -84,9 +94,12 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
                 
             #constraints on states:
             for m in range(max_state.shape[0]):
-
-                opti.subject_to(X[m,k]<= max_state[m] )
-                opti.subject_to(min_state[m] <= X[m,k])
+                if n_humans !=0:
+                    opti.subject_to(X[0:(n_agents-n_humans)*n_states,k] <= max_state)
+                    opti.subject_to(min_state <= X[0:(n_agents-n_humans)*n_states,k] )
+                else:
+                    opti.subject_to(X[m,k]<= max_state[m] )
+                    opti.subject_to(min_state[m] <= X[m,k])
             
         #equality constraints for initial condition:
         opti.subject_to(X[:,0] == x0)
@@ -136,13 +149,16 @@ def solve_rhc(x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
             print(f"Terminated! at loop = {i}, converged is {converged}")
             t_solve_end = perf_counter()
             t_solve = t_solve_end-t_solve_start
+            
+            logging.info(
+            f'{j_trial},'
+            f'{n_agents},{t},{failed_count},{converged},'
+            f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},'
+                )
+            
             break
             
-    logging.info(
-    f'{j_trial},'
-    f'{n_agents},{t},{failed_count},{converged},'
-    f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},'
-        )
+    
         
     return X_full,U_full, t, J_list, failed_count, converged
 

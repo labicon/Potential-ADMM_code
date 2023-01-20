@@ -159,24 +159,22 @@ def solve_rhc_distributed(
 
             di.minimize(costi)
 
-            n_states_local = statesi.shape[
-                0
-            ]  # each subproblem has different number of states
+            n_states_local = statesi.shape[0]  # each subproblem has different number of states
             # print(f'n_states_local:{n_states_local}')
             n_inputs_local = inputsi.shape[0]
             x_dims_local = [int(n_states)] * int(n_states_local / n_states)
         
             print(f"current sub-problem has state dimension : {x_dims_local} \n")
-            if n_humans !=0:
-                if any(item in ids_ for item in id_humans):
-                    
-                    human_count = sum(item in ids_ for item in id_humans)
-                    drones_count = len(x_dims_local)-human_count
-                    #print(f'{human_count} human agents are detected in the sub problem')
-                    n_dims_local = [3]*drones_count
-                    n_dims_local+= [2]*2
-                    print('n_dims is {n_dims_local}')
-                    f = generate_f_human_drone(x_dims_local,human_count)
+            # if n_humans !=0:
+            if any(item in ids_ for item in id_humans):
+
+                human_count = sum(item in ids_ for item in id_humans) #Number of humans in the current sub-problem
+                drones_count = len(x_dims_local)-human_count
+                #print(f'{human_count} human agents are detected in the sub problem')
+                n_dims_local = [3]*drones_count
+                n_dims_local+= [2]*human_count
+                print(f'n_dims is {n_dims_local}')
+                f = generate_f_human_drone(x_dims_local,human_count)
             else:
                 f = generate_f(x_dims_local)
                 drones_count = len(x_dims_local)
@@ -205,6 +203,10 @@ def solve_rhc_distributed(
                     # print(f'inputsi has shape{inputsi[0:drones_count*n_inputs,k].shape},max_inputs has shape{max_inputs.shape}\n')
                     di.subject_to(inputsi[0:drones_count*n_inputs,k] <= max_inputs[: , 0:drones_count*n_inputs].T)
                     di.subject_to(min_inputs[: , 0:drones_count*n_inputs].T <= inputsi[0:drones_count*n_inputs,k])
+                    
+                    # di.subject_to(inputsi[:,k] <= max_inputs.T)
+                    # di.subject_to(min_inputs.T <= inputsi[:,k])
+                    
                 
 
             for k in range(N + 1):
@@ -212,6 +214,10 @@ def solve_rhc_distributed(
                     # print(f'statesi has shape{statesi[0:drones_count*n_states,k].shape},max_states has shape{max_states.shape}\n')
                     di.subject_to(statesi[0:drones_count*n_states, k] <= max_states[:, 0:drones_count*n_states].T)
                     di.subject_to(min_states[:, 0:drones_count*n_states].T <= statesi[0:drones_count*n_states, k])
+                    
+                    # di.subject_to(statesi[:, k] <= max_states.T)
+                    # di.subject_to(min_states.T <= statesi[:, k])
+     
 
                 # collision avoidance over control horizon (only if the current sub-problem contains the states of more than 1 agent):
 
@@ -288,13 +294,14 @@ def solve_rhc_distributed(
             print(f"Terminated! at loop = {loop}, converged is {converged} \n")
             t_solve_end = perf_counter()
             t_solve = t_solve_end-t_solve_start
+            
+            logging.info(
+                f'{j_trial},'
+                f'{n_agents},{t},{failed_count},{converged},'
+                f'{objective_val},{N},{dt},"{ids}",{radius},{centralized},{t_solve},'
+            )
             break
         
-    logging.info(
-        f'{j_trial},'
-        f'{n_agents},{t},{failed_count},{converged},'
-        f'{objective_val},{N},{dt},"{ids}",{radius},{centralized},{t_solve},'
-    )
         
 
     return X_full, U_full, t, J_list, failed_count, converged

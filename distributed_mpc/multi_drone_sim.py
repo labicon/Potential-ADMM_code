@@ -42,7 +42,7 @@ centralized = True
 soft_constraint = False
 
 if __name__ == "__main__" :
-    radius = 0.7 #for distributed, multiply by 1/2
+    radius = 0.35 
     N = 15
     n_states = 6
     n_inputs = 3
