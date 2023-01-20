@@ -37,16 +37,15 @@ min_input_base = np.array([[theta_min], [phi_min], [tau_min]])
 max_state_base = np.array([[x_max], [y_max], [z_max], [v_max],[v_max], [v_max]])
 min_state_base = np.array([[x_min], [y_min], [z_min], [v_min],[v_min],[v_min]])
 
-radius = 0.35
-N = 15
-n_states = 6
-n_inputs = 3
 
 centralized = True
 soft_constraint = False
 
 if __name__ == "__main__" :
-    
+    radius = 0.7 #for distributed, multiply by 1/2
+    N = 15
+    n_states = 6
+    n_inputs = 3
     print("Choose the number of agents (3,5, 10 or 15):")
     n_agents = int(input())
     max_input = np.tile(max_input_base,(n_agents,1))
@@ -62,6 +61,7 @@ if __name__ == "__main__" :
     
     if flag == 'distributed':
         centralized = False
+        
 
     if n_agents == 3:
         x0,xf = util.paper_setup_3_quads()
