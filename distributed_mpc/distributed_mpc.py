@@ -199,7 +199,7 @@ def solve_rhc_distributed(
                 # di.subject_to(min_inputs.T <= inputsi[:, k])
                 
                 if drones_count !=0:
-                    # print(f'inputsi has shape{inputsi[0:drones_count*n_inputs,k].shape},max_inputs has shape{max_inputs.shape}\n')
+                    # print(f'inputsi has shape{inputsi[0:drones_count*n_inputs,k].shape},max_inputs has     shape{max_inputs.shape}\n')
                     di.subject_to(inputsi[0:drones_count*n_inputs,k] <= max_inputs[: , 0:drones_count*n_inputs].T)
                     di.subject_to(min_inputs[: , 0:drones_count*n_inputs].T <= inputsi[0:drones_count*n_inputs,k])
                     
