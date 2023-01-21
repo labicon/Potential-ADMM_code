@@ -42,6 +42,7 @@ centralized = True
 soft_constraint = False
 
 if __name__ == "__main__" :
+    dt = 0.1
     radius = 0.35 
     N = 15
     n_states = 6
@@ -54,7 +55,7 @@ if __name__ == "__main__" :
     min_state = np.tile(min_state_base,(n_agents,1))
     
     print("Choose the number of human agents (0, 1,2, or 3): ")
-    n_human_agents = int(input())
+    n_humans = int(input())
     
     print("Choose the distributed or centralized:")
     flag = input()
@@ -113,8 +114,9 @@ if __name__ == "__main__" :
         
     if centralized:
         file_name = f'{n_agents}_drones_centralized_sim_data'
-        X_full,U_full, t, J_list, failed_count, converged = solve_rhc(x0,xf,u_ref,N,Q,R,Qf,                                                                      n_agents,n_states,n_inputs,radius,
-        max_input,min_input,max_state,min_state)
+        X_full,U_full, t, J_list, failed_count, converged = solve_rhc(
+                                        dt,x0,xf,u_ref,N,Q,R,Qf,                                                                                                     n_agents,n_states,n_inputs,radius,
+                                        max_input,min_input,max_state,min_state,n_humans)
   
     if not centralized:
         if soft_constraint == True:
@@ -129,9 +131,9 @@ if __name__ == "__main__" :
             file_name = f'{n_agents}_drones_distributed_sim_data'
             ids =  [100 + i for i in range(n_agents)]
             X_full, U_full, t, J_list, failed_count, converged = solve_rhc_distributed(
-                                            x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
+                                            dt,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
                                             x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,
-                                              theta_min,tau_max,tau_min,phi_max,phi_min,n_human_agents,n_dims
+                                              theta_min,tau_max,tau_min,phi_max,phi_min,n_humans,n_dims
                                                 )
             
     np.save(file_name, X_full,U_full,t)
