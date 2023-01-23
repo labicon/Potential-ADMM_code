@@ -41,6 +41,7 @@ def solve_rhc_distributed(
     
     if n_humans!=0:
         id_humans = ids[-n_humans:]
+        id_humans=id_humans/2.0 
     else:
         id_humans = None
     
