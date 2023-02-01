@@ -12,7 +12,7 @@ centralized = False
 def solve_rhc_distributed(
     dt,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,\
     x_min,x_max,y_min,y_max,z_min,z_max,v_min,v_max,theta_max,\
-  theta_min,tau_max,tau_min,phi_max,phi_min,n_humans,n_dims=None,j_trial=None):
+  theta_min,tau_max,tau_min,phi_max,phi_min,n_humans,unit_dist,n_dims=None,j_trial=None,equal_dist = False):
 
     x_dims = [n_states] * n_agents
     u_dims = [n_inputs] * n_agents
@@ -150,6 +150,7 @@ def solve_rhc_distributed(
             graph.items(),
             range(len(d)),
         ):  # loop over sub-problems
+            print(f'statesi has shape {statesi[:,0].shape}')
 
             print(f"Solving the {count}th sub-problem at iteration {loop}, t = {t} \n")
 
@@ -205,12 +206,11 @@ def solve_rhc_distributed(
                     
                     # di.subject_to(inputsi[:,k] <= max_inputs.T)
                     # di.subject_to(min_inputs.T <= inputsi[:,k])
-                    
-                
 
             for k in range(N + 1):
                 if drones_count !=0:
-                    # print(f'statesi has shape{statesi[0:drones_count*n_states,k].shape},max_states has shape{max_states.shape}\n')
+                    # print(f'statesi has shape{statesi[0:drones_count*n_states,k].shape}
+                    # ,max_states has shape{max_states.shape}\n')
                     di.subject_to(statesi[0:drones_count*n_states, k] <= max_states[:, 0:drones_count*n_states].T)
                     di.subject_to(min_states[:, 0:drones_count*n_states].T <= statesi[0:drones_count*n_states, k])
                     
@@ -218,14 +218,22 @@ def solve_rhc_distributed(
                     # di.subject_to(min_states.T <= statesi[:, k])
      
 
-                # collision avoidance over control horizon (only if the current sub-problem contains the states of more than 1 agent):
+                # Collision avoidance over the current prediction horizon: 
+                # (only if the current sub-problem contains more than 1 agent):
 
                 if len(x_dims_local) != 1:
-                    distances = compute_pairwise_distance_nd_Sym(
-                        statesi[:, k], x_dims_local, n_dims_local
-                    )
-                    for n in distances:
-                        di.subject_to(n >= radius)
+                    if equal_dist == True:
+                        # distances = compute_distances_square(statesi[:,k])
+                        # for n in distances:
+                        #     di.subject_to(n == unit_dist)
+                        pass
+
+                    else:
+                        distances = compute_pairwise_distance_nd_Sym(
+                            statesi[:, k], x_dims_local, n_dims_local
+                        )
+                        for n in distances:
+                            di.subject_to (n >= radius)
 
             # equality constraints for initial condition:
             di.subject_to(

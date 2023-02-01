@@ -456,11 +456,11 @@ def compute_pairwise_distance_nd_Sym(X, x_dims, n_dims):
     for i, n_dim_i in zip(range(n_agents), n_dims):
         for j, n_dim_j in zip(range(i + 1, n_agents), n_dims[i + 1 :]):
             n_dim = min(n_dim_i, n_dim_j)
-            # print(i,j)
+
             Xi = X[i * n_states : i * n_states + n_dim, :]
             Xj = X[j * n_states : j * n_states + n_dim, :]
             dX = Xi-Xj
-            # print(dX.shape)
+
             if n_dim == 3:
                 distances.append(sqrt(dX[0,:]**2+dX[1,:]**2+dX[2,:]**2+eps))
             else:
@@ -468,7 +468,15 @@ def compute_pairwise_distance_nd_Sym(X, x_dims, n_dims):
     
     return distances
 
+def compute_distances_square(X):
+    eps = 1e-3
+    distances = []
+ 
+    dist1 = sqrt((X[0]-X[6])**2 + (X[1]-X[7])**2 + (X[2]-X[8])**2+eps )
+    distances.append(dist1)
+    
 
+    return distances
 
 
 
