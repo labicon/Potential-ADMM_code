@@ -20,7 +20,7 @@ def solve_rhc_distributed(
     p_opts = {"expand": True}
     s_opts = {"max_iter": 200, "print_level": 0}
 
-    M = 50  # this is the maximum number of outer iterations
+    M = 100  # this is the maximum number of outer iterations
     
     n_x = n_agents * n_states
     # n_u = n_agents * n_inputs
@@ -150,7 +150,9 @@ def solve_rhc_distributed(
             graph.items(),
             range(len(d)),
         ):  # loop over sub-problems
-            print(f'statesi has shape {statesi[:,0].shape}')
+
+            print(f'prob is {prob}, ids is {ids_}')
+            # print(f'statesi has shape {statesi[:,0].shape}')
 
             print(f"Solving the {count}th sub-problem at iteration {loop}, t = {t} \n")
 
@@ -221,19 +223,31 @@ def solve_rhc_distributed(
                 # Collision avoidance over the current prediction horizon: 
                 # (only if the current sub-problem contains more than 1 agent):
 
+                #Below is a hard-coded example for a heterogenous formation control task:
                 if len(x_dims_local) != 1:
-                    if equal_dist == True:
-                        # distances = compute_distances_square(statesi[:,k])
-                        # for n in distances:
-                        #     di.subject_to(n == unit_dist)
-                        pass
-
-                    else:
-                        distances = compute_pairwise_distance_nd_Sym(
-                            statesi[:, k], x_dims_local, n_dims_local
-                        )
-                        for n in distances:
-                            di.subject_to (n >= radius)
+                    # if equal_dist == True:
+                    #     # if [ind == 100 or 101 or 102 or 103 for ind in ids_]:
+                    #     #     # distances = compute_distances_square(statesi[:,k])
+                    #     #     # for n in distances:
+                    #     #     #     di.subject_to(n == unit_dist)
+                                                
+                    #     # distances = compute_pairwise_distance_nd_Sym(statesi[:, k], x_dims_local, n_dims_local)
+                    #     # for n in distances:
+                    #     #     di.subject_to (n >= radius)
+                    #     #     else:
+                    #     if len(ids_) >2 :
+                    #         distances = compute_pairwise_distance_nd_Sym(statesi[:, k], x_dims_local, n_dims_local)
+                    #         for n in distances:
+                    #             di.subject_to(n >= radius)
+                    #     else:
+                    #         pass
+            
+                    # else:
+                    distances = compute_pairwise_distance_nd_Sym(
+                        statesi[:, k], x_dims_local, n_dims_local
+                    )
+                    for n in distances:
+                        di.subject_to (n >= radius)
 
             # equality constraints for initial condition:
             di.subject_to(

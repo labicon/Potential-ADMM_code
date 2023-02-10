@@ -20,17 +20,18 @@ v_min = -3
 theta_min = -np.pi / 6
 phi_min = -np.pi / 6
 
-tau_max = 15
+tau_max = 20
 tau_min = 0
 
-x_min = -5
-x_max = 5
+x_min = -10
+x_max = 10
 
-y_min = -5
-y_max = 5
+y_min = -10
+y_max = 10
 
 z_min = 0
-z_max = 3.0
+# z_max = 3.0
+z_max = 4.0
 
 max_input_base = np.array([[theta_max], [phi_max], [tau_max]])
 min_input_base = np.array([[theta_min], [phi_min], [tau_min]])
@@ -41,14 +42,15 @@ min_state_base = np.array([[x_min], [y_min], [z_min], [v_min],[v_min],[v_min]])
 centralized = True
 soft_constraint = False
 equal_dist = True
-if __name__ == "__main__" :
 
+if __name__ == "__main__" :
+    unit_dist = 1
     dt = 0.1
     radius = 0.35 
     N = 15
     n_states = 6
     n_inputs = 3
-    print("Choose the number of agents (3, 4, 5, 10 or 15):")
+    print("Choose the number of agents (3, 4, 5, 8, 10 or 15):")
     n_agents = int(input())
     max_input = np.tile(max_input_base,(n_agents,1))
     min_input = np.tile(min_input_base,(n_agents,1))
@@ -78,20 +80,23 @@ if __name__ == "__main__" :
         
         if equal_dist == True:
             unit_dist = 1.0
-            radius = 0.55
-            x0 = np.array([[-2, 0, 1, 0, 0, 0,
-                            -2, 1, 1, 0, 0, 0,
+            radius = 0.5
+            x0 = np.array([[
                             2 ,0, 1, 0, 0, 0,
-                            2, 1, 1, 0, 0, 0]], 
+                            2, 1, 1, 0, 0, 0,
+                            1.5, 1.5, 1.5, 0, 0, 0,
+                            2.5, 2.5, 1.5, 0, 0, 0]], 
                             dtype=float).T
-            xf = np.array([[-2+unit_dist*2, 0+unit_dist*2, 1.5, 0, 0, 0,
-                            -2+unit_dist*2, 1+unit_dist*2, 1.5, 0, 0, 0,
+            xf = np.array([[
                             2+unit_dist*2 ,0+unit_dist*2, 1.5, 0, 0, 0,
-                            2+unit_dist*2, 1+unit_dist*2, 1.5, 0, 0, 0]], 
+                            2+unit_dist*2, 1+unit_dist*2, 1.5, 0, 0, 0,
+                            3.5, 1.5, 1.5, 0, 0, 0, 
+                            2.5, -1.0, 1.5, 0, 0, 0]], 
                             dtype=float).T
         else:
             x0,xf = util.setup_4_quads()
         u_ref = np.array([0,0,g,0,0,g,0,0,g,0,0,g])
+                        
         Q = np.diag([5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1])
         R = np.eye(n_agents*n_inputs)*0.01
         Qf = np.eye(n_agents*n_states)*1000
@@ -109,7 +114,7 @@ if __name__ == "__main__" :
         
     elif n_agents == 10:
         x0,xf = util.paper_setup_10_quads()
-        radius = 0.3
+        radius = 0.2
         u_ref = np.array([0,0,g,0,0,g,0,0,g,0,0,g,0,0,g,
                          0,0,g,0,0,g,0,0,g,0,0,g,0,0,g])
         Q = np.diag([5,5,5,1,1,1,5,5,5,1,1,1,5,5,5,1,1,1,\
@@ -152,7 +157,7 @@ if __name__ == "__main__" :
                                               theta_min,tau_max,tau_min,phi_max,phi_min
                                                 )
         else:
-            file_name = f'{n_agents}_drones_distributed_sim_data(equal_dist)'
+            file_name = f'{n_agents}_drones_distributed_sim_data'
             ids =  [100 + i for i in range(n_agents)]
             X_full, U_full, t, J_list, failed_count, converged = solve_rhc_distributed(
                                             dt,x0, xf, u_ref, N, n_agents, n_states, n_inputs, radius, ids,
