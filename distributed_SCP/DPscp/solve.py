@@ -1,6 +1,5 @@
-
 """
-Starter code for the problem "Cart-pole swing-up with limited actuation".
+Adapted from the problem "Cart-pole swing-up with limited actuation".
 Autonomous Systems Lab (ASL), Stanford University
 """
 
@@ -12,6 +11,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from functools import partial
 from animations import animate_cartpole
+import dpilqr as dec
 
 
 @partial(jax.jit, static_argnums=(0,))
@@ -19,8 +19,8 @@ from animations import animate_cartpole
 def linearize(fd: callable,
               s: jnp.ndarray,
               u: jnp.ndarray):
-    """Linearize the dynamics function `fd(s,u)` around nominal `(s,u)`."""
 
+    """Linearize the dynamics function `fd(s,u)` around nominal `(s,u)`."""
     # Use JAX to linearize `fd` around `(s,u)`.
 
     A = jax.jacfwd(fd,0)(s,u)
@@ -41,7 +41,7 @@ def solve_swingup_scp(fd: callable,
                       ρ: float,
                       tol: float,
                       max_iters: int):
-    """Solve the cart-pole swing-up problem via SCP."""
+    """Solve the cart-pole swing-up problem via SCP (the outer loop)."""
     n = Q.shape[0]  # state dimension
     m = R.shape[0]  # control dimension
 
@@ -79,7 +79,7 @@ def solve_swingup_scp(fd: callable,
 def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
                   N: int, s_bar: np.ndarray, u_bar: np.ndarray,
                   s_goal: np.ndarray, s0: np.ndarray,
-                  ru: float, ρ: float):
+                  ru: float, ρ: float, x_dims: list):
     """Solve a single SCP sub-problem for the cart-pole swing-up problem."""
     A, B, c = linearize(fd, s_bar[:-1], u_bar)
     A, B, c = np.array(A), np.array(B), np.array(c)
@@ -89,11 +89,9 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
     
     s_cvx = cvx.Variable((N + 1, n))
     u_cvx = cvx.Variable((N, m))
-    # ####################### PART (c): YOUR CODE BELOW #######################
 
-    # INSTRUCTIONS: Construct and solve the convex sub-problem for SCP.
+    # Construct and solve the convex sub-problem for SCP.
 
-    # TODO: Replace the two lines below with your code.
     objective = 0.
 
     constraints = []
@@ -132,85 +130,3 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
     return s, u, obj
 
 
-def cartpole(s, u):
-    """Compute the cart-pole state derivative."""
-    mp = 1.     # pendulum mass
-    mc = 4.     # cart mass
-    ℓ = 1.      # pendulum length
-    g = 9.81    # gravitational acceleration
-
-    x, θ, dx, dθ = s
-    sinθ, cosθ = jnp.sin(θ), jnp.cos(θ)
-    h = mc + mp*(sinθ**2)
-    ds = jnp.array([
-        dx,
-        dθ,
-        (mp*sinθ*(ℓ*(dθ**2) + g*cosθ) + u[0]) / h,
-        -((mc + mp)*g*sinθ + mp*ℓ*(dθ**2)*sinθ*cosθ + u[0]*cosθ) / (h*ℓ)
-    ])
-    return ds
-
-
-def discretize(f, dt):
-    """Discretize continuous-time dynamics `f` via Runge-Kutta integration."""
-
-    def integrator(s, u, dt=dt):
-        k1 = dt * f(s, u)
-        k2 = dt * f(s + k1 / 2, u)
-        k3 = dt * f(s + k2 / 2, u)
-        k4 = dt * f(s + k3, u)
-        return s + (k1 + 2 * k2 + 2 * k3 + k4) / 6
-
-    return integrator
-
-
-# Cartpole swing-up simulation parameters
-n = 4                                # state dimension
-m = 1                                # control dimension
-s_goal = np.array([0, np.pi, 0, 0])  # desired upright pendulum state
-s0 = np.array([0, 0, 0, 0])          # initial downright pendulum state
-dt = 0.1                             # discrete time resolution
-T = 10.                              # total simulation time
-
-# Dynamics
-fd = jax.jit(discretize(cartpole, dt))
-
-# SCP parameters
-P = 1e3*np.eye(n)                    # terminal state cost matrix
-Q = np.diag([1e-2, 1., 1e-3, 1e-3])  # state cost matrix
-R = 1e-3*np.eye(m)                   # control cost matrix
-ρ = 1.                               # trust region parameter
-ru = 8.                              # control effort bound
-tol = 5e-1                           # convergence tolerance
-max_iters = 100                      # maximum number of SCP iterations
-
-# Solve the swing-up problem with SCP
-t = np.arange(0., T + dt, dt)
-N = t.size - 1
-s, u = solve_swingup_scp(fd, P, Q, R, N, s_goal, s0, ru, ρ, tol, max_iters)
-
-# Simulate open-loop control
-for k in range(N):
-    s[k+1] = fd(s[k], u[k])
-
-# Plot state and control trajectories
-fig, ax = plt.subplots(1, n + 1, figsize=(15, 3), dpi=150)
-plt.subplots_adjust(wspace=0.55)
-ylabels = (r'$x(t)$', r'$\theta(t)$', r'$\dot{x}(t)$', r'$\dot{\theta}(t)$',
-           r'$u(t)$')
-for i in range(n):
-    ax[i].plot(t, s[:, i], color='tab:blue')
-    ax[i].axhline(s_goal[i], linestyle='--', color='tab:orange')
-    ax[i].set_xlabel(r'$t$')
-    ax[i].set_ylabel(ylabels[i])
-ax[n].plot(t[0:N], u)
-ax[n].set_xlabel(r'$t$')
-ax[n].set_ylabel(ylabels[n])
-plt.savefig('cartpole_swingup_limited_actuation.png',
-            bbox_inches='tight')
-plt.show()
-
-# Animate the solution
-fig, ani = animate_cartpole(t, s[:, 0], s[:, 1])
-ani.save('cartpole_scp_swingup.gif', writer='ffmpeg')
-plt.show()
