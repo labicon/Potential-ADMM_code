@@ -21,136 +21,100 @@ def discretize(f, dt):
 
     return integrator
 
-"""
-Instantiate an abstract class such that each class inherited from DynamicalModel
-must have the same abstractmethod :
 
-"""
-class DynamicalModel(abc.ABC):
-    _id = 0
-    def __init__(self, n_x, n_u, dt, id=None):
-        if not id:
-            id = DynamicalModel._id
-            DynamicalModel.id +=1
+class QuadrotorDynamics: #this is a "simulator"
+    def __init__(self, dt):
+        # Define constants
+        self.g = 9.81  # Acceleration due to gravity (m/s^2)
+        self.m = 0.5  # Mass of quadrotor (kg)
+        self.l = 0.2  # Length of arm (m)
+        self.Jx = 0.004  # Moment of inertia around x-axis (kg*m^2)
+        self.Jy = 0.004  # Moment of inertia around y-axis (kg*m^2)
+        self.Jz = 0.008  # Moment of inertia around z-axis (kg*m^2)
+        self.kF = 6.11e-8  # Force constant (N/(rad/s)^2)
+        self.kM = 1.5e-9  # Moment constant (N*m/(rad/s)^2)
 
-        self.n_x = n_x
-        self.n_u = n_u
-        self.dt = dt
-        self.id = id
-        
-    def __call__(self, x, u):
+        # Initialize state variables
+        self.x = np.zeros((13, 1))  # State vector [x, y, z, vx, vy, vz, phi, theta, psi, p, q, r, t]
+        self.dt = dt  # Timestep
 
-        return discretize(self.f,self.dt)
+    def update(self, u):
+        # Unpack state vector and input vector
+        x = self.x
+        dt = self.dt
+        m = self.m
+        l = self.l
+        Jx = self.Jx
+        Jy = self.Jy
+        Jz = self.Jz
+        kF = self.kF
+        kM = self.kM
+        g = self.g
+        u1, u2, u3, u4 = u
 
-    @staticmethod
-    def f():
+        # Compute rotation matrix and its derivative
+        phi = x[6, 0]
+        theta = x[7, 0]
+        psi = x[8, 0]
+        R = np.array([[np.cos(psi)*np.cos(theta), np.cos(psi)*np.sin(theta)*np.sin(phi) - np.sin(psi)*np.cos(phi),
+                       np.cos(psi)*np.sin(theta)*np.cos(phi) + np.sin(psi)*np.sin(phi)],
+                      [np.sin(psi)*np.cos(theta), np.sin(psi)*np.sin(theta)*np.sin(phi) + np.cos(psi)*np.cos(phi),
+                       np.sin(psi)*np.sin(theta)*np.cos(phi) - np.cos(psi)*np.sin(phi)],
+                      [-np.sin(theta), np.cos(theta)*np.sin(phi), np.cos(theta)*np.cos(phi)]])
+        Rdot = np.array([[np.sin(psi)*np.sin(theta)*np.sin(phi) - np.cos(psi)*np.cos(phi), -np.sin(psi)*np.cos(theta)*np.sin(phi) - np.cos(psi)*np.sin(phi), -np.cos(psi)*np.sin(theta)],
+                         [np.cos(psi)*np.cos(phi) - np.sin(psi)*np.sin(theta)*np.sin(phi), -np.cos(psi)*np.cos(theta)*np.sin(phi) - np.sin(psi)*np.sin(phi), np.sin(psi)*np.sin(theta)],
+                         [0, -np.cos(theta)*np.sin(phi), -np.cos(theta)*np.cos(phi)]]) @ np.array([[x[9, 0]], [x[10, 0]], [x[11, 0]]])
 
-        pass
+        # Compute forces and moments
+        F1 = kF * u1
+        F2 = kF * u2
+        F3 = kF * u3
+        F4 = kF * u4
 
-    @abc.abstractmethod
-    def linearize():
+        F = np.array([0, 0, F1+F2+F3+F4])
+        M = np.array([(l*kF)*(u1-u3), (l*kF)*(u2-u4), kM*(u1-u2+u3-u4)])
 
-        pass
+        # Compute acceleration and angular acceleration
+        a = (1/m)*R.dot(F) - np.array([0, 0, g])
+        omega = np.array([[x[9, 0]], [x[10, 0]], [x[11, 0]]])
+        alpha = np.linalg.inv(np.diag([Jx, Jy, Jz])).dot(M - np.cross(omega, np.diag([Jx, Jy, Jz]).dot(omega), axis=0))
 
-    @classmethod
-    def _reset_ids(cls):
+        # Compute new state vector
+        xdot = np.zeros((13, 1))
+        xdot[0:3] = x[3:6]
+        xdot[3:6] = a
+        xdot[6:9] = Rdot
+        xdot[9:12] = alpha
+        xdot[12] = 1
 
-        cls._id =0
+        xnew = x + xdot*dt
+        self.x = xnew
 
-    def __repr__(self):
-        return f"{type(self).__name__}(n_x: {self.n_x}, n_u: {self.n_u}, id: {self.id})"
+        # Output position and orientation
+        """
+        Rz(psi) = [[cos(psi), -sin(psi), 0],
+            [sin(psi),  cos(psi), 0],
+            [       0,         0, 1]]
 
+        Ry(theta) = [[ cos(theta), 0, sin(theta)],
+                    [          0, 1,          0],
+                    [-sin(theta), 0, cos(theta)]]
 
-class MultiDynamicalModel(DynamicalModel):
-    """Encompasses the dynamical simulation and linearization for a collection of
-    DynamicalModel's
-    """
-    def __init__(self, submodels):
-        self.submodels = submodels
-        self.n_players = len(submodels)
+        Rx(phi) = [[1,          0,           0],
+                [0, cos(phi), -sin(phi)],
+                [0, sin(phi),  cos(phi)]]
 
-        self.x_dims = [submodel.n_x for submodel in submodels]
-        self.u_dims = [submodel.n_u for submodel in submodels]
-        self.ids = [submodel.id for submodel in submodels]
+        R = Rz(psi) @ Ry(theta) @ Rx(phi)
 
-        super().__init__(sum(self.x_dims), sum(self.u_dims), submodels[0].dt, -1)
+        R is computed in the body frame
 
+        """
 
-    def f(self, s, u):
-        """Derivative of the current combined states and controls"""
-        xn = np.zeros_like(x)
-        nx = self.x_dims[0]
-        nu = self.u_dims[0]
-        for i, model in enumerate(self.submodels):
-            xn[i * nx : (i + 1) * nx] = model.f(
-                setattr[i * nx : (i + 1) * nx], u[i * nu : (i + 1) * nu]
-            )
-        return xn
-
-    def __call__(self, s, u):
-        """Zero-order hold to integrate continuous dynamics f"""
-
-        # return forward_euler_integration(self.f, x, u, self.dt)
-        # return rk4_integration(self.f, x, u, self.dt, self.dt)
-        xn = np.zeros_like(s)
-        nx = self.x_dims[0]
-        nu = self.u_dims[0]
-        for i, model in enumerate(self.submodels):
-            xn[i * nx : (i + 1) * nx] = model.__call__(
-                s[i * nx : (i + 1) * nx], u[i * nu : (i + 1) * nu]
-            )
-        return xn
-
-    
-    def linearize(self, x, u):
-        sub_linearizations = [
-            submodel.linearize(xi.flatten(), ui.flatten())
-            for submodel, xi, ui in zip(
-                self.submodels,
-                split_agents_gen(x, self.x_dims),
-                split_agents_gen(u, self.u_dims),
-            )
-        ]
- 
-        sub_As = [AB[0] for AB in sub_linearizations]
-        sub_Bs = [AB[1] for AB in sub_linearizations]
-
-        return uniform_block_diag(*sub_As), uniform_block_diag(*sub_Bs)
-
+        pos = xnew[0:3]
+        R = np.array([[np.cos(xnew[8, 0])*np.cos(xnew[7, 0]), np.cos(xnew[8, 0])*np.sin(xnew[7, 0])*np.sin(xnew[6, 0]) - np.sin(xnew[8, 0])*np.cos(xnew[6, 0]), np.cos(xnew[8, 0])*np.sin(xnew[7, 0])*np.cos(xnew[6, 0]) + np.sin(xnew[8, 0])*np.sin(xnew[6, 0])],
+                      [np.sin(xnew[8, 0])*np.cos(xnew[7, 0]), np.sin(xnew[8, 0])*np.sin(xnew[7, 0])*np.sin(xnew[6, 0]) + np.cos(xnew[8, 0])*np.cos(xnew[6, 0]), np.sin(xnew[8, 0])*np.sin(xnew[7, 0])*np.cos(xnew[6, 0]) - np.cos(xnew[8, 0])*np.sin(xnew[6, 0])],
+                      [-np.sin(xnew[7, 0]), np.cos(xnew[7, 0])*np.sin(xnew[6, 0]), np.cos(xnew[7, 0])*np.cos(xnew[6, 0])]])
+        return pos, R
 
 
-def QuadDynamics6D(s,u):
-    g = 9.81
-    x, y, z, vx, vy, vz = s
-    theta, phi, tau = u
-    ds = jnp.array([
-
-        vx,
-        vy,
-        vz,
-        g*jnp.tan(theta),
-        -g*jnp.tan(phi),
-        tau-g
-
-    ])
-
-    return ds
-
-# def cartpole(s, u):
-#     """Compute the cart-pole state derivative."""
-#     mp = 1.     # pendulum mass
-#     mc = 4.     # cart mass
-#     ℓ = 1.      # pendulum length
-#     g = 9.81    # gravitational acceleration
-
-#     x, θ, dx, dθ = s
-#     sinθ, cosθ = jnp.sin(θ), jnp.cos(θ)
-#     h = mc + mp*(sinθ**2)
-#     ds = jnp.array([
-#         dx,
-#         dθ,
-#         (mp*sinθ*(ℓ*(dθ**2) + g*cosθ) + u[0]) / h,
-#         -((mc + mp)*g*sinθ + mp*ℓ*(dθ**2)*sinθ*cosθ + u[0]*cosθ) / (h*ℓ)
-#     ])
-#     return ds
 

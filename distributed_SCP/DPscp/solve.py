@@ -1,132 +1,182 @@
-"""
-Adapted from the problem "Cart-pole swing-up with limited actuation".
-Autonomous Systems Lab (ASL), Stanford University
-"""
-
 import numpy as np
-import cvxpy as cvx
-import jax
-import jax.numpy as jnp
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from functools import partial
-from animations import animate_cartpole
-import dpilqr as dec
+import cvxpy as cp
+
+# State vector [x, y, z, vx, vy, vz, phi, theta, psi, p, q, r, t]
 
 
-@partial(jax.jit, static_argnums=(0,))
-@partial(jax.vmap, in_axes=(None, 0, 0))
-def linearize(fd: callable,
-              s: jnp.ndarray,
-              u: jnp.ndarray):
+class MultiQuadSCP:
+    def __init__(self, num_quads, num_waypoints, dt, kF, kM, g, x_init, x_end):
+        self.num_quads = num_quads
+        self.num_waypoints = num_waypoints
+        self.dt = dt
+        self.kF = kF
+        self.kM = kM
+        self.g = g
+        self.x_init = x_init
+        self.x_desired = np.tile(np.array(x_end), (num_waypoints,self.num_quads*13))
+        self.u_prev = np.zeros((num_waypoints, self.num_quads*4))
+        # self.u_desired = np.zeros((num_quads, num_waypoints, 4))
+        # self.u_desired = np.zeros((num_waypoints,self.num_quads*4))
+        self.v_max = 2*np.ones((num_quads, 3))
+        self.w_max = 2*np.ones((num_quads, 3))
 
-    """Linearize the dynamics function `fd(s,u)` around nominal `(s,u)`."""
-    # Use JAX to linearize `fd` around `(s,u)`.
+    def quad_dynamics(self, x, u):
+        f = np.array([0, 0, self.kF*np.sum(u[:3])])
+        tau = np.array([self.kM*(u[1]-u[3]), self.kM*(u[2]-u[0]), self.kM*(u[1]+u[3]-u[0]-u[2])])
+        return f, tau
 
-    A = jax.jacfwd(fd,0)(s,u)
-    B = jax.jacfwd(fd,1)(s,u)
-    c = fd(s,u)-A@s-B@u
+    def quaternion_product(self, q, r):
+        p = np.zeros(4)
+        p[0] = r[0]*q[0] - r[1]*q[1] - r[2]*q[2] - r[3]*q[3]
+        p[1] = r[0]*q[1] + r[1]*q[0] - r[2]*q[3] + r[3]*q[2]
+        p[2] = r[0]*q[2] + r[1]*q[3] + r[2]*q[0] - r[3]*q[1]
+        p[3] = r[0]*q[3] - r[1]*q[2] + r[2]*q[1] + r[3]*q[0]
+        return p
+    
+    def euler_to_quaternion(self, euler):
+        cy = np.cos(euler[2] * 0.5)
+        sy = np.sin(euler[2] * 0.5)
+        cp = np.cos(euler[1] * 0.5)
+        sp = np.sin(euler[1] * 0.5)
+        cr = np.cos(euler[0] * 0.5)
+        sr = np.sin(euler[0] * 0.5)
+        qw = cy * cp * cr + sy * sp * sr
+        qx = cy * cp * sr - sy * sp * cr
+        qy = sy * cp * sr + cy * sp * cr
+        qz = sy * cp * cr - cy * sp * sr
+        return np.array([qw, qx, qy, qz])
 
-    return A, B, c
+    def solve(self):
+        
+        x = cp.Variable((self.num_waypoints,self.num_quads*13))
+        u = cp.Variable((self.num_waypoints,self.num_quads*4))   #motor commands PWM
 
+        # Set initial and final conditions
+        for i in range(self.num_quads):
+            constraints = [
+                x[0, :] == self.x_init,
+                x[-1, :] == self.x_desired
+            ]
 
-def solve_swingup_scp(fd: callable,
-                      P: np.ndarray,
-                      Q: np.ndarray,
-                      R: np.ndarray,
-                      N: int,
-                      s_goal: np.ndarray,
-                      s0: np.ndarray,
-                      ru: float,
-                      ρ: float,
-                      tol: float,
-                      max_iters: int):
-    """Solve the cart-pole swing-up problem via SCP (the outer loop)."""
-    n = Q.shape[0]  # state dimension
-    m = R.shape[0]  # control dimension
+        # Set dynamics constraints and collision avoidance constraints
+        for j in range(self.num_quads):
+            for i in range(self.num_waypoints-1):
+                x_prev = x[i, j*13:(j+1)*13]
+                u_prev = u[i, j*13:(j+1)*13]
+                x_next = x[i+1, j*13:(j+1)*13]
+                u_next = u[i+1, j*13:(j+1)*13]
 
-    # Initialize nominal trajectories
-    u_bar = np.zeros((N, m))
-    s_bar = np.zeros((N + 1, n))
-    s_bar[0] = s0
-    for k in range(N):
-        s_bar[k+1] = fd(s_bar[k], u_bar[k])
+                #Dynamics constraints
+                f, tau = self.quad_dynamics(x_prev, u_prev) #forces & torques at current time step
+                
+                constraints += [x_next[:3] == x_prev[:3] + x_prev[7:10]*self.dt,              #position dynamics
+                                
+                                x_next[3:7] == self.quaternion_product(x_prev[3:7], \
+                                            self.euler_to_quaternion(x_prev[10:13]*self.dt)), #orientation dynamics 
+                                
+                                x_next[7:10] == x_prev[7:10] + \
+                                f/self.kF*self.dt*np.array([0, 0, 1]) \
+                                - np.array([0, 0, self.g])*self.dt,    #velocity dynamics; thrust is projected along +z
+                                
+                                x_next[10:13] == x_prev[10:13] + self.kM/self.kF*self.dt*tau] #angular velocity dynamics
 
-    # Do SCP until convergence or maximum number of iterations is reached
-    converged = False
-    obj_prev = np.inf
-    for i in (prog_bar := tqdm(range(max_iters))):
-        s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, s0,
-                                  ru, ρ)
-        diff_obj = np.abs(obj - obj_prev)
-        prog_bar.set_postfix({'objective change': '{:.5f}'.format(diff_obj)})
+                # Collision avoidance constraints
+                for k in range(self.num_quads):
+                    if k == j:
+                        continue
+                    constraints += [cp.norm(x_next[:3] - x[i+1, k*3:(k+1)*3]) >= 2*self.quad_radius]
 
-        if diff_obj < tol:
-            converged = True
-            print('SCP converged after {} iterations.'.format(i))
-            break
+        # Set input constraints
+        for i in range(self.num_quads):
+            for j in range(self.num_waypoints):
+                constraints += [u[i, j, :] >= np.zeros(4),
+                                u[i, j, :] <= np.array([self.kF, self.kF, self.kM, self.kF])]
+        
+        # Set velocity and angular velocity limits
+        for i in range(self.num_quads):
+            for j in range(self.num_waypoints - 1):
+                constraints += [cp.norm((x[i, j+1, :3] - x[i, j, :3])/self.dt) <= self.v_max[i],
+                                cp.norm((x[i, j+1, 3:6] - x[i, j, 3:6])/self.dt) <= self.omega_max[i]]
+
+        # Add collision avoidance constraints
+        for i in range(self.num_quads):
+            for j in range(self.num_waypoints - 1):
+                for k in range(self.num_quads):
+                    if k != i:
+                        constraints += [cp.norm(x[i, j, :3] - x[k, j, :3]) >= 2*self.radius,
+                                        cp.norm(x[i, j+1, :3] - x[k, j+1, :3]) >= 2*self.radius,
+                                        cp.norm(x[i, j, :2] - x[k, j, :2]) >= self.radius,
+                                        cp.norm(x[i, j+1, :2] - x[k, j+1, :2]) >= self.radius]
+                                        
+        # Add initial and final position constraints
+        for i in range(self.num_quads):
+            constraints += [x[i, 0, :3] == self.waypoints[i][0],
+                            x[i, self.num_waypoints-1, :3] == self.waypoints[i][-1]]
+            
+        # Add initial and final velocity constraints
+        for i in range(self.num_quads):
+            constraints += [cp.norm((x[i, 1, :3] - x[i, 0, :3])/self.dt) <= self.v_max[i],
+                            cp.norm((x[i, self.num_waypoints-1, :3] - x[i, self.num_waypoints-2, :3])/self.dt) <= self.v_max[i]]
+            
+        # Add initial and final angular velocity constraints
+        for i in range(self.num_quads):
+            constraints += [cp.norm((x[i, 1, 3:6] - x[i, 0, 3:6])/self.dt) <= self.omega_max[i],
+                            cp.norm((x[i, self.num_waypoints-1, 3:6] - x[i, self.num_waypoints-2, 3:6])/self.dt) <= self.omega_max[i]]
+            
+        # Additional Dynamics constraints 
+        omega_prev = x_prev[10:13]
+        omega_next = x_next[10:13]
+        R_prev = self.rotation_matrix(x_prev[3:7])
+        R_next = self.rotation_matrix(x_next[3:7])
+        F_prev = self.kF*np.sum(u_prev)
+        F_next = self.kF*np.sum(u_next)
+
+        constraints += [cp.sum_squares(x_next[3:6] - cp.cross(omega_next, R_next.T @ self.gravity)) <= self.epsilon, #constraint on the angular velocity
+                        cp.sum_squares(F_next - R_next @ np.array([0, 0, self.g])) <= self.epsilon,  #constraint on the thrust force of the quadrotor
+                        cp.sum_squares(x_next[7:10]) <= self.epsilon,  #constraint on the quadrotor's linear velocity
+                        cp.sum_squares(omega_next) <= self.epsilon]    #constraint on the quadrotor's angular velocity
+        
+
+        # Set cost function
+        cost = 0
+        for i in range(self.num_quads):
+            for j in range(self.num_waypoints):
+                cost += cp.norm(x[i, j, :3] - self.x_desired[i, j, :3])**2 # Distance from desired position
+                cost += cp.norm(x[i, j, 3:7] - self.x_desired[i, j, 3:7])**2 # Distance from desired orientation
+                cost += cp.norm(x[i, j, 7:10])**2 # Velocity magnitude
+                cost += cp.norm(x[i, j, 10:13])**2 # Angular velocity magnitude
+                cost += self.control_penalty*cp.sum_squares(u[i, j, :]) # Control penalty
+
+        # Solve optimization problem
+        prob = cp.Problem(cp.Minimize(cost), constraints)
+        prob.solve(solver=cp.ECOS, verbose=True)
+        if prob.status != cp.OPTIMAL:
+            print("Optimization failed!")
+            return None
+        
         else:
-            obj_prev = obj
-            np.copyto(s_bar, s)
-            np.copyto(u_bar, u)
+            
+            # Extract optimal trajectories and motor commands
+            x_opt = x.value
+            u_opt = u.value
 
-    if not converged:
-        raise RuntimeError('SCP did not converge!')
+            return x_opt, u_opt
+        
 
-    return s, u
+def main():
+    num_quads = 2
+    num_waypoints = 30
 
+    x_end = [2.5, 1.8, 2.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
 
-def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
-                  N: int, s_bar: np.ndarray, u_bar: np.ndarray,
-                  s_goal: np.ndarray, s0: np.ndarray,
-                  ru: float, ρ: float, x_dims: list):
-    """Solve a single SCP sub-problem for the cart-pole swing-up problem."""
-    A, B, c = linearize(fd, s_bar[:-1], u_bar)
-    A, B, c = np.array(A), np.array(B), np.array(c)
-
-    n = Q.shape[0]
-    m = R.shape[0]
-    
-    s_cvx = cvx.Variable((N + 1, n))
-    u_cvx = cvx.Variable((N, m))
-
-    # Construct and solve the convex sub-problem for SCP.
-
-    objective = 0.
-
-    constraints = []
-    constraints +=[s_cvx[0,:] == s_bar[0]]
-
-    for k in range(N):
-      
-
-      objective += cvx.quad_form(s_cvx[k,:] - s_goal, Q) + cvx.quad_form(u_cvx[k,:], R) 
-
-      constraints += [s_cvx[k+1,:] == A[k]@s_cvx[k,:] + B[k]@u_cvx[k,:] + c[k]]
-
-      constraints += [-ru <= u_cvx[k,:], u_cvx[k,:] <= ru]
-
-      #Note: without the following convex trust regions, the solution blows up 
-      #just after a few iterations
-      constraints += [cvx.pnorm(s_cvx[k,:]-s_bar[k,:],'inf') <= ρ]
-      constraints += [cvx.pnorm(u_cvx[k,:]-u_bar[k,:],'inf') <= ρ]
-
-    objective += cvx.quad_form(s_cvx[-1,:] - s_goal, P)
-    
-
-    # ############################# END PART (c) ##############################
-
-    prob = cvx.Problem(cvx.Minimize(objective), constraints)
-    prob.solve()  
-  
-    if prob.status != 'optimal':
-        raise RuntimeError('SCP solve failed. Problem status: ' + prob.status)
-
-    s = s_cvx.value
-    u = u_cvx.value
-
-    obj = prob.objective.value
-
-    return s, u, obj
+    custom_values = [[0, 0, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], [1.0, 1.5,  1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+    custom_x_init = np.array(custom_values)
 
 
+    quad_scp = MultiQuadSCP(num_quads=num_quads, num_waypoints=num_waypoints, dt = 0.05,\
+                             kF = 6.11e-8, kM = 1.5e-9, g = 9.81, x_init=custom_x_init, x_end=x_end)
+    x_trj, u_trj = quad_scp.solve()
+
+
+if __name__ == "__main__":
+    main()
