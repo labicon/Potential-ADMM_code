@@ -1,8 +1,8 @@
 import numpy as np
 import cvxpy as cp
-
-# State vector [x, y, z, vx, vy, vz, phi, theta, psi, p, q, r, t]
-
+import jax
+import jax.numpy as jnp
+from functools import partial
 
 class MultiQuadSCP:
     def __init__(self, num_quads, num_waypoints, dt, kF, kM, g, x_init, x_end):
@@ -13,17 +13,21 @@ class MultiQuadSCP:
         self.kM = kM
         self.g = g
         self.x_init = x_init
-        self.x_desired = np.tile(np.array(x_end), (num_waypoints,self.num_quads*13))
+        self.x_desired = x_end
         self.u_prev = np.zeros((num_waypoints, self.num_quads*4))
         # self.u_desired = np.zeros((num_quads, num_waypoints, 4))
-        # self.u_desired = np.zeros((num_waypoints,self.num_quads*4))
+        self.u_desired = np.zeros((num_waypoints,self.num_quads*4))
         self.v_max = 2*np.ones((num_quads, 3))
         self.w_max = 2*np.ones((num_quads, 3))
 
     def quad_dynamics(self, x, u):
-        f = np.array([0, 0, self.kF*np.sum(u[:3])])
+        """This function maps motor commands to actual torques and forces"""
+        
+        f = np.array([0, 0, self.kF*sum(u[:3])])
         tau = np.array([self.kM*(u[1]-u[3]), self.kM*(u[2]-u[0]), self.kM*(u[1]+u[3]-u[0]-u[2])])
+
         return f, tau
+    
 
     def quaternion_product(self, q, r):
         p = np.zeros(4)
@@ -34,17 +38,18 @@ class MultiQuadSCP:
         return p
     
     def euler_to_quaternion(self, euler):
-        cy = np.cos(euler[2] * 0.5)
-        sy = np.sin(euler[2] * 0.5)
-        cp = np.cos(euler[1] * 0.5)
-        sp = np.sin(euler[1] * 0.5)
-        cr = np.cos(euler[0] * 0.5)
-        sr = np.sin(euler[0] * 0.5)
+        cy = jnp.cos(euler[2] * 0.5)
+        sy = jnp.sin(euler[2] * 0.5)
+        cp = jnp.cos(euler[1] * 0.5)
+        sp = jnp.sin(euler[1] * 0.5)
+        cr = jnp.cos(euler[0] * 0.5)
+        sr = jnp.sin(euler[0] * 0.5)
         qw = cy * cp * cr + sy * sp * sr
         qx = cy * cp * sr - sy * sp * cr
         qy = sy * cp * sr + cy * sp * cr
         qz = sy * cp * cr - cy * sp * sr
         return np.array([qw, qx, qy, qz])
+
 
     def solve(self):
         
@@ -54,21 +59,22 @@ class MultiQuadSCP:
         # Set initial and final conditions
         for i in range(self.num_quads):
             constraints = [
-                x[0, :] == self.x_init,
-                x[-1, :] == self.x_desired
+                x[0, :] == self.x_init.flatten(),
+                x[-1, :] == self.x_desired.flatten()
             ]
 
         # Set dynamics constraints and collision avoidance constraints
-        for j in range(self.num_quads):
-            for i in range(self.num_waypoints-1):
+        for i in range(self.num_waypoints-1):
+            for j in range(self.num_quads):
                 x_prev = x[i, j*13:(j+1)*13]
-                u_prev = u[i, j*13:(j+1)*13]
+                u_prev = u[i, j*4:(j+1)*4]
                 x_next = x[i+1, j*13:(j+1)*13]
-                u_next = u[i+1, j*13:(j+1)*13]
+                u_next = u[i+1, j*4:(j+1)*4]
 
-                #Dynamics constraints
+                #compute forces and torques from motor commands
                 f, tau = self.quad_dynamics(x_prev, u_prev) #forces & torques at current time step
                 
+                #Discretized dynamics constraints:
                 constraints += [x_next[:3] == x_prev[:3] + x_prev[7:10]*self.dt,              #position dynamics
                                 
                                 x_next[3:7] == self.quaternion_product(x_prev[3:7], \
@@ -84,44 +90,45 @@ class MultiQuadSCP:
                 for k in range(self.num_quads):
                     if k == j:
                         continue
-                    constraints += [cp.norm(x_next[:3] - x[i+1, k*3:(k+1)*3]) >= 2*self.quad_radius]
+                    constraints += [cp.norm(x_next[:3] - x[i+1, k*13:(k+1)*13][:3]) >= 2*self.quad_radius]
 
         # Set input constraints
         for i in range(self.num_quads):
             for j in range(self.num_waypoints):
-                constraints += [u[i, j, :] >= np.zeros(4),
-                                u[i, j, :] <= np.array([self.kF, self.kF, self.kM, self.kF])]
+                constraints += [u[j, i*4:(i+1)*4] >= np.zeros(4),
+                                u[i, i*4:(i+1)*4] <= np.array([self.kF, self.kF, self.kM, self.kF])]
         
         # Set velocity and angular velocity limits
         for i in range(self.num_quads):
             for j in range(self.num_waypoints - 1):
-                constraints += [cp.norm((x[i, j+1, :3] - x[i, j, :3])/self.dt) <= self.v_max[i],
-                                cp.norm((x[i, j+1, 3:6] - x[i, j, 3:6])/self.dt) <= self.omega_max[i]]
+                constraints += [cp.norm((x[j*13:(j+1)*13, i+1][:3] - x[j*13:(k+1)*13, i][:3])/self.dt) <= self.v_max[i],
+                                cp.norm((x[j*13:(j+1)*13, i+1][3:6] - x[j*13:(k+1)*13, i][3:6])/self.dt) <= self.omega_max[i]]
 
         # Add collision avoidance constraints
         for i in range(self.num_quads):
             for j in range(self.num_waypoints - 1):
                 for k in range(self.num_quads):
                     if k != i:
-                        constraints += [cp.norm(x[i, j, :3] - x[k, j, :3]) >= 2*self.radius,
-                                        cp.norm(x[i, j+1, :3] - x[k, j+1, :3]) >= 2*self.radius,
-                                        cp.norm(x[i, j, :2] - x[k, j, :2]) >= self.radius,
-                                        cp.norm(x[i, j+1, :2] - x[k, j+1, :2]) >= self.radius]
+                        constraints += [cp.norm(x[j, i*13:(i+1)*13][0:3] - x[j, k*13:(k+1)*13][0:3]) >= 2*self.radius,
+                                        cp.norm(x[j+1, i*13:(i+1)*13][0:3] - x[j+1, k*13:(k+1)*13][0:3]) >= 2*self.radius,
+                                        cp.norm(x[j, i*13:(i+1)*13][0:2] - x[j, k*13:(k+1)*13][0:2]) >= self.radius,
+                                        cp.norm(x[j+1, i*13:(i+1)*13][0:2] - x[j+1, k*13:(k+1)*13][0:2]) >= self.radius]
                                         
         # Add initial and final position constraints
         for i in range(self.num_quads):
-            constraints += [x[i, 0, :3] == self.waypoints[i][0],
-                            x[i, self.num_waypoints-1, :3] == self.waypoints[i][-1]]
+            constraints += [x[0, i*13:(i+1)*13][0:3] == self.x_init[0:3],
+                            x[self.num_waypoints-1, i*13:(i+1)*13][0:3] == self.x_desired[0:3]]
             
         # Add initial and final velocity constraints
         for i in range(self.num_quads):
-            constraints += [cp.norm((x[i, 1, :3] - x[i, 0, :3])/self.dt) <= self.v_max[i],
-                            cp.norm((x[i, self.num_waypoints-1, :3] - x[i, self.num_waypoints-2, :3])/self.dt) <= self.v_max[i]]
+            constraints += [cp.norm((x[1, i*13:(i+1)*13][0:3] - x[0, i*13:(i+1)*13][0:3])/self.dt) <= self.v_max[i],
+                            cp.norm((x[self.num_waypoints-1, i*13:(i+1)*13][0:3] - x[self.num_waypoints-2, i*13:(i+1)*13][0:3])/self.dt) <= self.v_max[i]]
             
         # Add initial and final angular velocity constraints
         for i in range(self.num_quads):
-            constraints += [cp.norm((x[i, 1, 3:6] - x[i, 0, 3:6])/self.dt) <= self.omega_max[i],
-                            cp.norm((x[i, self.num_waypoints-1, 3:6] - x[i, self.num_waypoints-2, 3:6])/self.dt) <= self.omega_max[i]]
+            constraints += [cp.norm((x[1, i*13:(i+1)*13][3:6]- x[0, i*13:(i+1)*13][3:6])/self.dt) <= self.omega_max[i],
+                            cp.norm((x[self.num_waypoints-1, i*13:(i+1)*13][3:6] - \
+                                     x[self.num_waypoints-2,i*13:(i+1)*13][3:6])/self.dt) <= self.omega_max[i]]
             
         # Additional Dynamics constraints 
         omega_prev = x_prev[10:13]
@@ -141,11 +148,11 @@ class MultiQuadSCP:
         cost = 0
         for i in range(self.num_quads):
             for j in range(self.num_waypoints):
-                cost += cp.norm(x[i, j, :3] - self.x_desired[i, j, :3])**2 # Distance from desired position
-                cost += cp.norm(x[i, j, 3:7] - self.x_desired[i, j, 3:7])**2 # Distance from desired orientation
-                cost += cp.norm(x[i, j, 7:10])**2 # Velocity magnitude
-                cost += cp.norm(x[i, j, 10:13])**2 # Angular velocity magnitude
-                cost += self.control_penalty*cp.sum_squares(u[i, j, :]) # Control penalty
+                cost += cp.norm(x[j, i*13:(i+1)*13][0:3] - self.x_desired[j, i*13:(i+1)*13][0:3])**2 # Distance from desired position
+                cost += cp.norm(x[j, i*13:(i+1)*13][3:7] - self.x_desired[i, i*13:(i+1)*13][3:7])**2 # Distance from desired orientation
+                cost += cp.norm(x[j, i*13:(i+1)*13][7:10])**2 # Velocity magnitude
+                cost += cp.norm(x[j, i*13:(i+1)*13][10:13])**2 # Angular velocity magnitude
+                cost += self.control_penalty*cp.sum_squares(u[j, i*4:(i+1)*4]) # Control penalty
 
         # Solve optimization problem
         prob = cp.Problem(cp.Minimize(cost), constraints)
@@ -165,9 +172,10 @@ class MultiQuadSCP:
 
 def main():
     num_quads = 2
-    num_waypoints = 30
+    num_waypoints = 50
 
-    x_end = [2.5, 1.8, 2.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+    x_end = [[2.5, 1.8, 2.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],[2.5, 1.8, 2.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
+    x_end = np.array(x_end)
 
     custom_values = [[0, 0, 1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], [1.0, 1.5,  1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]
     custom_x_init = np.array(custom_values)
