@@ -36,7 +36,7 @@ def solve_scp(fd: callable,
                       ρ: float,
                       tol: float,
                       max_iters: int):
-    """Solve the cart-pole swing-up problem via SCP."""
+    """Solve the cart-pole swing-up problem via SCP. This function is used for one-shot optimization"""
     n = Q.shape[0]  # state dimension
     m = R.shape[0]  # control dimension
 
@@ -81,37 +81,32 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
 
     n = Q.shape[0]
     m = R.shape[0]
-    
+    n_drones = m//3
     s_cvx = cvx.Variable((N + 1, n))
     u_cvx = cvx.Variable((N, m))
-    # ####################### PART (c): YOUR CODE BELOW #######################
 
-    # INSTRUCTIONS: Construct and solve the convex sub-problem for SCP.
-
-    # TODO: Replace the two lines below with your code.
     objective = 0.
 
     constraints = []
     constraints +=[s_cvx[0,:] == s_bar[0]]
 
     for k in range(N):
-      
 
       objective += cvx.quad_form(s_cvx[k,:] - s_goal, Q) + cvx.quad_form(u_cvx[k,:], R) 
-
       constraints += [s_cvx[k+1,:] == A[k]@s_cvx[k,:] + B[k]@u_cvx[k,:] + c[k]]
 
-    #   constraints += [-ru <= u_cvx[k,:], u_cvx[k,:] <= ru]
+      for id in range(n_drones):
 
+        constraints += [-np.array([-np.pi/6, -np.pi/6, 0]) <= u_cvx[k,id*3:(id+1)*3], \
+                        u_cvx[k,id*3:(id+1)*3] <= np.array([np.pi/6, np.pi/6, 20])]
+    
       #Note: without the following convex trust regions, the solution blows up 
       #just after a few iterations
-      constraints += [cvx.pnorm(s_cvx[k,:]-s_bar[k,:],'inf') <= ρ]
-      constraints += [cvx.pnorm(u_cvx[k,:]-u_bar[k,:],'inf') <= ρ]
+        # constraints += [cvx.pnorm(s_cvx[k,id*3:(id+1)*3]-s_bar[k,id*3:(id+1)*3],'inf') <= ρ]
+        # constraints += [cvx.pnorm(u_cvx[k,id*3:(id+1)*3]-u_bar[k,id*3:(id+1)*3],'inf') <= ρ] 
 
     objective += cvx.quad_form(s_cvx[-1,:] - s_goal, P)
     
-
-    # ############################# END PART (c) ##############################
 
     prob = cvx.Problem(cvx.Minimize(objective), constraints)
     prob.solve()  
@@ -171,6 +166,7 @@ def multi_Quad_Dynamics(s, u):
         
         x_ds.append(x_d)
     
+    # print(f'shape is {jnp.concatenate(x_ds).shape}')
     return jnp.concatenate(x_ds)
 
 def discretize(f, dt):
@@ -186,17 +182,18 @@ def discretize(f, dt):
     return integrator
 
 
-#simulation parameters
+"""Run SCP in centralized receding-horizon:"""
+
 n_agents = 2
 n_states = 6
 n_controls = 3
 g = 9.81
 n = 12                                # state dimension
 m = 6                                # control dimension
-s_goal = np.array([1.5, 1.5, 1.2, 0,  0 , 0, 2.5, 1.5, 1.5, 0, 0 , 0])  # desired state
+s_goal = np.array([-1.5, -1.5, 1.2, 0,  0 , 0, 2.5, 1.5, 1.5, 0, 0 , 0])  # desired state
 s0 = np.array([0, 0, 0.8, 0, 0, 0, 1.5, 1.0, 1.0, 0, 0, 0])          # initial state
 dt = 0.1                             # discrete time resolution
-T = 10.                              # total simulation time
+# T = 15.                              # total simulation time
 
 # Dynamics
 x_dims = [6, 6]
@@ -205,28 +202,65 @@ fd = jax.jit(discretize(multi_Quad_Dynamics,dt))
 # SCP parameters
 
 P = 1e3*np.eye(n)                    # terminal state cost matrix
-Q = np.eye(n)  # state cost matrix
+Q = np.eye(n)*10  # state cost matrix
 R = 1e-3*np.eye(m)                   # control cost matrix
-ρ = 1.                               # trust region parameter
+ρ = 3.                               # trust region parameter
 ru = 8.                              # control effort bound
 tol = 5e-1                           # convergence tolerance
 max_iters = 100                      # maximum number of SCP iterations
 
 # Solve the swing-up problem with SCP
-t = np.arange(0., T + dt, dt)
-N = t.size - 1
-s, u = solve_scp(fd, P, Q, R, N, s_goal, s0, ru, ρ, tol, max_iters)
+# t = np.arange(0., T + dt, dt)
+# N = t.size - 1
+N = 15
+converged = False
+
+count = 0
+si = s0
+obj_list = []
+
+# scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
+#                   N: int, s_bar: np.ndarray, u_bar: np.ndarray,
+#                   s_goal: np.ndarray, s0: np.ndarray,
+#                   ru: float, ρ: float):
+
+
+u_bar = np.zeros((N, m))
+s_bar = np.zeros((N + 1, n))
+s_bar[0] = s0
+for k in range(N):
+    s_bar[k+1] = fd(s_bar[k], u_bar[k])
+
+
+X_trj =  np.zeros((0, n))  #Full trajectory over entire problem horizon (not just a single prediction horizon)
+STEP_SIZE=1
+"""TODO: the problem is blowing up: objective value grows unbounded somehow"""
+while not np.all(dec.distance_to_goal(si, s_goal.reshape(1,-1), n_agents = 2,n_states = 6,n_d= 3) < 0.1) :
+    count +=1
+    s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, si, ru, ρ)
+    obj_list.append(obj)
+    
+    print(f'current objective value is {obj}!')
+
+    si = s[STEP_SIZE,:]
+    X_trj = np.r_[X_trj, s[:STEP_SIZE]]
+
+    u_bar = np.zeros((N, m))
+    s_bar = np.zeros((N + 1, n))
+    s_bar[0] = si
+    for k in range(N):
+        s_bar[k+1] = fd(s_bar[k], u_bar[k])
+
+    if count > 50:
+        print('max. number of outer iterations reached!')
+        break
 
 # Simulate open-loop control
 for k in range(N):
     s[k+1] = fd(s[k], u[k])
 
 # Plot state and control trajectories
+print(f'Full trajectory has shape {X_trj.shape}')
 fig = plt.figure(dpi=200)
-dec.plot_solve(s,0,s_goal,x_dims,n_d = 3)
+dec.plot_solve(X_trj,0,s_goal,x_dims,n_d = 3)
 plt.savefig('2_quad_SCP.png')
-
-# # Animate the solution
-# fig, ani = animate_cartpole(t, s[:, 0], s[:, 1])
-# ani.save('cartpole_scp_swingup.gif', writer='ffmpeg')
-# plt.show()
