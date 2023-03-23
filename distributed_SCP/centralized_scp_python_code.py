@@ -8,6 +8,8 @@ from tqdm import tqdm
 from functools import partial
 import dpilqr as dec
 from scipy.optimize import quadratic_assignment
+from scipy.sparse import csr_matrix
+from scipy.optimize import quadratic_assignment
 # from animations import animate_cartpole
 
 
@@ -61,9 +63,29 @@ def initAllSolutions(po, pf, h, K):
 
 
     #i need to convert velocity to acceleration now 
-def solve_quadratic_program():
+def solve_quadratic_program(H, Ain_total, Aeqtot):
+    H_sparse = csr_matrix(H)
+    Ain_total_sparse = csr_matrix(Ain_total)
+    Aeqtot_sparse = csr_matrix(Aeqtot)
 
+    result = quadratic_assignment(H_sparse, Ain_total_sparse)
 
+    atot, f0, exitflag = result[0], result[1], result[3]
+
+    if (len(atot) == 0 or exitflag == 0):
+        p = []
+        v = []
+        a = []
+        success = 0
+
+    return result
+
+success = exitflag
+p, v, a = getStates(po, atot, A_p, A_v, K, N)
+prev_p = p
+criteria = abs(prev_f0 - f0)
+prev_f0 = f0
+k += 1
 
 
 def centralizedSCP (po,pf,h,K,N,pmin,pmax,rmin,alim,A_p, A_v,E1,E2,order):
