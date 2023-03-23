@@ -157,7 +157,5 @@ def main():
     x_opt, u_opt, objective = quad_scp.solve()
 
     
-
-
 if __name__ == "__main__":
     main()
