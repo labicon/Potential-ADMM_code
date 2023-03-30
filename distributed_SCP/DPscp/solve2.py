@@ -30,7 +30,6 @@ def solve_scp(fd: callable,
                       N: int,
                       s_goal: np.ndarray,
                       s0: np.ndarray,
-                      ru: float,
                       ρ: float,
                       tol: float,
                       max_iters: int,
@@ -53,7 +52,7 @@ def solve_scp(fd: callable,
     s_prev = None
     for i in (prog_bar := tqdm(range(max_iters))):
         s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, s0,
-                                  ru, ρ, iterate, s_prev, n_drones)
+                                 ρ, iterate, s_prev, n_drones)
         
         iterate+=1
 
@@ -68,6 +67,7 @@ def solve_scp(fd: callable,
             obj_prev = obj
             np.copyto(s_bar, s)
             np.copyto(u_bar, u)
+            ρ = ρ * 0.85
         
         s_prev = s
 
@@ -80,7 +80,7 @@ def solve_scp(fd: callable,
 def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
                   N: int, s_bar: np.ndarray, u_bar: np.ndarray,
                   s_goal: np.ndarray, s0: np.ndarray,
-                  ru: float, ρ: float, iterate: int, s_prev: np.ndarray, n_drones: int):
+                  ρ: float, iterate: int, s_prev: np.ndarray, n_drones: int):
     """Solve a single SCP sub-problem for the cart-pole swing-up problem."""
     A, B, c = linearize(fd, s_bar[:-1], u_bar)
     A, B, c = np.array(A), np.array(B), np.array(c)
@@ -127,13 +127,13 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
                                             @ (curr_pos[i][0:3]-curr_pos[j][0:3]) >= COLLISION_RADIUS]
                             
         else: #in case we want to test our code with a single drone
-
-            constraints += [np.array([ -2, -2, -2, 0]) <= u_cvx[k, :], \
-                            u_cvx[k, :] <= np.array([2, 2, 2, 15])]
+   
+            constraints += [np.array([ -1, -1, -1, 0]) <= u_cvx[k, :], \
+                            u_cvx[k, :] <= np.array([1, 1, 1, 10])]
                 
             #state constraints:
-            constraints+= [np.array([-5., -5. , 0.9, -np.pi/3, -np.pi/3, -np.pi/3, -5., -5., -5., -1.5, -1.5, -1.5]) <= s_cvx[k, :],\
-                        s_cvx[k, :] <= np.array([5. , 5. , 3., np.pi/3, np.pi/3, np.pi/3, 5., 5., 5., 1.5, 1.5, 1.5])]
+            # constraints+= [np.array([-5., -5. , 0.9, -np.pi/3, -np.pi/3, -np.pi/3, -5., -5., -5., -1.5, -1.5, -1.5]) <= s_cvx[k, :],\
+            #             s_cvx[k, :] <= np.array([5. , 5. , 3., np.pi/3, np.pi/3, np.pi/3, 5., 5., 5., 1.5, 1.5, 1.5])]
 
             constraints += [cvx.pnorm(s_cvx[k,:]-s_bar[k,:],'inf') <= ρ]
             constraints += [cvx.pnorm(u_cvx[k,:]-u_bar[k,:],'inf') <= ρ] 
@@ -143,7 +143,7 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
     print(f'total number of constraints is {len(constraints)}')
     prob = cvx.Problem(cvx.Minimize(objective), constraints)
     prob.solve(verbose = True)  
-  
+    
     if prob.status != 'optimal':
         raise RuntimeError('SCP solve failed. Problem status: ' + prob.status)
 
@@ -179,10 +179,7 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
 #     return f, tau
 
 def single_quad_dynamics(s, u, x_dims):
-
-    # f_z,tau = quad_dynamics(s, u)
-
-
+    #x_dims is just a place holder to make it consistent with multi_Quad_Dynamics
 
     tau_x, tau_y, tau_z, f_z = u[0], u[1], u[2], u[3]
     psi = s[3]
@@ -195,6 +192,8 @@ def single_quad_dynamics(s, u, x_dims):
     w_y = s[10]
     w_z = s[11]
 
+    #model is derived after plugging into physical parameters found via sys ID
+    #see https://github.com/RandyChen233/AE483_Autonomous_Control_Lab/blob/main/lab05/analysis_part1.ipynb
     x_d = jnp.array([
         v_x*jnp.cos(psi)*jnp.cos(theta) + v_y*(jnp.sin(phi)*jnp.sin(theta)*jnp.cos(psi) - jnp.sin(psi)*jnp.cos(phi)) + v_z*(jnp.sin(phi)*jnp.sin(psi) + jnp.sin(theta)*jnp.cos(phi)*jnp.cos(psi)),
         v_x*jnp.sin(psi)*jnp.cos(theta) + v_y*(jnp.sin(phi)*jnp.sin(psi)*jnp.sin(theta) + jnp.cos(phi)*jnp.cos(psi)) - v_z*(jnp.sin(phi)*jnp.cos(psi) - jnp.sin(psi)*jnp.sin(theta)*jnp.cos(phi)), 
@@ -270,7 +269,7 @@ def discretize(f, dt):
     return integrator
 
 
-"""Example with 2 drones"""
+"""Example with 2 drones, one-shot horizon"""
 
 n_drones = 1
 n_states = 12
@@ -284,14 +283,13 @@ m = n_drones * n_controls                              # total control dimension
 #                    ])                                                     
 # s0 = np.array([0.1, 0.2, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 #                -0.5, 0.3, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
-# 
-# 
-s_goal = np.array([-1.5, -1.5, 1.2, 0,  0 , 0, 0, 0, 0, 0, 0 , 0])
+
+s_goal = np.array([-1.5, -1.5, 1.2, 0,  0 , 0, 0, 0, 0, 0, 0 , 0])  # for 1 drone only
 s0 = np.array([0.1, 0.2, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 
 dt = 0.1                             # discrete time resolution
-T = 15.                              # total simulation time
+T = 10.                              # total simulation time
 
 x_dims = [12, 12]
 # fd = jax.jit(discretize(multi_Quad_Dynamics,dt))
@@ -302,8 +300,7 @@ fd = jax.jit(discretize(single_quad_dynamics,dt))
 P = 1e3*np.eye(n)                    # terminal state cost matrix
 Q = np.eye(n)*10  # state cost matrix
 R = 1e-3*np.eye(m)                   # control cost matrix
-ρ = 2.                               # trust region parameter
-ru = 8.                              # control effort bound
+ρ = 200                              # trust region parameter
 tol = 5e-1                           # convergence tolerance
 max_iters = 100                      # maximum number of SCP iterations
 
@@ -311,13 +308,48 @@ t = np.arange(0., T + dt, dt)
 N = t.size - 1
 # N = 50  
 
-s, u = solve_scp(fd, P, Q, R, N, s_goal, s0, ru, ρ, tol, max_iters, n_drones)
+s, u = solve_scp(fd, P, Q, R, N, s_goal, s0, ρ, tol, max_iters, n_drones)
 
 # Simulate open-loop control
 for k in range(N):
     s[k+1] = fd(s[k], u[k])
 
-"""TODO: run SCP in RHC"""
+# Plot state trajectories
+fig, ax = plt.subplots(1, 3, figsize=(10, 3), dpi=150)
+ylabels = (r'$x(t)$', r'$y(t)$', r'$z(t)$', r'$tau_x(t)$',r'$tau_y(t)$',r'$tau_z(t)$',r'$f_z(t)$')
+
+for i in range(3):
+    ax[i].plot(t, s[:, i], color='tab:blue')
+    ax[i].axhline(s_goal[i], linestyle='--', color='tab:orange',label='reference position')
+    ax[i].set_xlabel(r'$t$')
+    ax[i].set_ylabel(ylabels[i])
+
+plt.savefig('state_tracking(singleDrone).png',
+            bbox_inches='tight')
+plt.show()
+
+#Plot control trajectories
+fig, ax = plt.subplots(1, 4, figsize=(10, 3), dpi=150)
+u_ref_upper = np.array([1, 1, 1, 10])
+u_ref_lower = np.array([-1, -1, -1, 0])
+
+for j in range(4):
+
+    ax[j].plot(t[:-1], u[:, j])
+    ax[j].axhline(u_ref_upper[j], linestyle='--',label='upper input bound')
+    ax[j].axhline(u_ref_lower[j], linestyle='--',label='lower input input')
+    ax[j].set_xlabel(r'$t$')
+    ax[j].set_ylabel(ylabels[j+3])
+
+
+plt.savefig('control_tracking(singleDrone).png',
+            bbox_inches='tight')
+plt.show()
+
+
+
+
+"""TODO: run SCP in receding horizons"""
 # def solve_rhc():
 #     count = 0
 #     si = s0

@@ -29,7 +29,6 @@ def linearize(fd: callable,
 
     return A, B, c
 
-
 def solve_swingup_scp(fd: callable,
                       P: np.ndarray,
                       Q: np.ndarray,
@@ -119,7 +118,7 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
     # ############################# END PART (c) ##############################
 
     prob = cvx.Problem(cvx.Minimize(objective), constraints)
-    prob.solve()  
+    prob.solve(verbose=True)  
   
     if prob.status != 'optimal':
         raise RuntimeError('SCP solve failed. Problem status: ' + prob.status)
@@ -133,7 +132,7 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
 
 
 def cartpole(s, u):
-    """Compute the cart-pole state derivative."""
+  
     mp = 1.     # pendulum mass
     mc = 4.     # cart mass
     ℓ = 1.      # pendulum length
@@ -188,8 +187,10 @@ max_iters = 100                      # maximum number of SCP iterations
 t = np.arange(0., T + dt, dt)
 N = t.size - 1
 s, u = solve_swingup_scp(fd, P, Q, R, N, s_goal, s0, ru, ρ, tol, max_iters)
+print(f's has shape {s.shape}, u has shape {u.shape}')
 
 # Simulate open-loop control
+#turns out that this step is redundant:
 for k in range(N):
     s[k+1] = fd(s[k], u[k])
 
