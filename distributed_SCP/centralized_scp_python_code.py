@@ -12,6 +12,7 @@ from scipy.sparse import csr_matrix
 from scipy.optimize import quadratic_assignment
 # from animations import animate_cartpole
 
+#use 6 dim dynamics
 
 @partial(jax.jit, static_argnums=(0,))
 @partial(jax.vmap, in_axes=(None, 0, 0))
@@ -48,44 +49,99 @@ def linearize(fd:callable, s: jnp.ndarray, u:jnp.ndarray):
     return A, B, c
 
 
-def initAllSolutions(po, pf, h, K):
-    po = np.squeeze(po)
-    pf = np.squeeze(pf)
-    N = po.shape[1]
-    t = np.arange(0, K*h, h)
-    p = np.zeros((po.shape[0], len(t), N))
-    for i in range(N):
-        diff = pf[:,i] - po[:,i]
-        for k in range(len(t)):
-            p[:,k,i] = po[:,i] + t[k]*diff/((K-1)*h)
-    return p
+#def initAllSolutions(po, pf, h, K):  #change to nonlinear
+    #po = np.squeeze(po)
+    #pf = np.squeeze(pf)
+    #N = po.shape[1]
+    #t = np.arange(0, K*h, h)
+    #p = np.zeros((po.shape[0], len(t), N))
+    #or i in range(N):
+        #diff = pf[:,i] - po[:,i]
+        #for k in range(len(t)):
+           # p[:,k,i] = po[:,i] + t[k]*diff/((K-1)*h)
+    #return p
+
+def initAllSolutions(fd:callable, s:jnp.ndarray, u:jnp.ndarray):
+    u_bar = np.zeros((N, m))
+    s_bar = np.zeros((N + 1, n))
+    s_bar[0] = s0
+    for k in range(N):
+        s_bar[k+1] = fd(s_bar[k], u_bar[k])
+    return s_bar
 
 
 
     #i need to convert velocity to acceleration now 
-def solve_quadratic_program(H, Ain_total, Aeqtot):
-    H_sparse = csr_matrix(H)
-    Ain_total_sparse = csr_matrix(Ain_total)
-    Aeqtot_sparse = csr_matrix(Aeqtot)
+#def solve_quadratic_program(H, Ain_total, Aeqtot):  #take this from cartpole example
+ #   H_sparse = csr_matrix(H)
+  #  Ain_total_sparse = csr_matrix(Ain_total)
+   # Aeqtot_sparse = csr_matrix(Aeqtot)
 
-    result = quadratic_assignment(H_sparse, Ain_total_sparse)
+    #result = quadratic_assignment(H_sparse, Ain_total_sparse)
 
-    atot, f0, exitflag = result[0], result[1], result[3]
+    #atot, f0, exitflag = result[0], result[1], result[3]
 
-    if (len(atot) == 0 or exitflag == 0):
-        p = []
-        v = []
-        a = []
-        success = 0
+    #if (len(atot) == 0 or exitflag == 0):
+     #   p = []
+      #  v = []
+       # a = []
+        #success = 0
 
-    return result
+    #return result
 
-success = exitflag
-p, v, a = getStates(po, atot, A_p, A_v, K, N)
-prev_p = p
-criteria = abs(prev_f0 - f0)
-prev_f0 = f0
-k += 1
+def solve_scp(fd: callable,
+                      P: np.ndarray,
+                      Q: np.ndarray,
+                      R: np.ndarray,
+                      N: int,
+                      s_goal: np.ndarray,
+                      s0: np.ndarray,
+                      ru: float,
+                      ρ: float,
+                      tol: float,
+                      max_iters: int,
+                      n_drones: int):
+    """This function is used for one-shot optimization"""
+    n = Q.shape[0]  # state dimension
+    m = R.shape[0]  # control dimension
+    converged = False
+    obj_prev = np.inf
+    iterate = 0
+    s_prev = None
+    for i in (prog_bar := tqdm(range(max_iters))):
+        s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, s0,
+                                  ru, ρ, iterate, s_prev, n_drones)
+        
+        iterate+=1
+
+        diff_obj = np.abs(obj - obj_prev)
+        prog_bar.set_postfix({'objective change': '{:.5f}'.format(diff_obj)})
+
+        if diff_obj < tol:
+            converged = True
+            print('SCP converged after {} iterations.'.format(i))
+            break
+        else:
+            obj_prev = obj
+            np.copyto(s_bar, s)
+            np.copyto(u_bar, u)
+        
+        s_prev = s
+
+    if not converged:
+        raise RuntimeError('SCP did not converge!')
+
+    return s, u
+
+
+
+
+#success = exitflag
+#p, v, a = getStates(po, atot, A_p, A_v, K, N)
+#prev_p = p
+#criteria = abs(prev_f0 - f0)
+#prev_f0 = f0
+#k += 1
 
 
 def centralizedSCP (po,pf,h,K,N,pmin,pmax,rmin,alim,A_p, A_v,E1,E2,order):
@@ -131,16 +187,16 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
             constraints += [-np.array([-np.pi/6, -np.pi/6, 0]) <= u_cvx[k, i*3:(i+1)*3], \
                         u_cvx[k, i*3:(i+1)*3] <= np.array([np.pi/6, np.pi/6, 20])]
         
-            # linearized collision avoidance constraints
-            if iterate > 0:
-                prev_pos = [s_prev[k][id:id+6] for id in range(0, len(s_prev[k]), 6)]
-                curr_pos = [s_cvx[k][id:id+6] for id in range(0, len(s_cvx[k]), 6)]
-                for j in range(n_drones):
-                    if j != i:
-                        constraints+= [cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3]) + \
-                                    (prev_pos[i][0:3].T-prev_pos[j][0:3].T)/cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3]) \
-                                    * (curr_pos[i][0:3]-curr_pos[j][0:3]) >= COLLISION_RADIUS]
-
+            # we want nonlinear collision avoidance constraints
+            #if iterate > 0:
+                #prev_pos = [s_prev[k][id:id+6] for id in range(0, len(s_prev[k]), 6)]
+                #curr_pos = [s_cvx[k][id:id+6] for id in range(0, len(s_cvx[k]), 6)]
+                #for j in range(n_drones):
+                 #   if j != i:
+                  #      constraints+= [cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3]) + \
+                   #                 (prev_pos[i][0:3].T-prev_pos[j][0:3].T)/cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3]) \
+                    #                * (curr_pos[i][0:3]-curr_pos[j][0:3]) >= COLLISION_RADIUS]
+            ρ=        
     
       
 
