@@ -145,9 +145,54 @@ def solve_scp(fd: callable,
 
 
 def centralizedSCP (po,pf,h,K,N,pmin,pmax,rmin,alim,A_p, A_v,E1,E2,order):
+
+    n = Q.shape[0]  
+    m = R.shape[0]
+
+    converged = False
+    obj_prev = np.inf
+    iterate = 0
+    s_prev = None
+    for i in (prog_bar := tqdm(range(max_iters))):
+        s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, s0,
+                                 ρ, iterate, s_prev, n_drones)
+        
+        iterate+=1
+
+        diff_obj = np.abs(obj - obj_prev)
+        prog_bar.set_postfix({'objective change': '{:.5f}'.format(diff_obj)})
+
+        if diff_obj < tol:
+            converged = True
+            print('SCP converged after {} iterations.'.format(i))
+            break
+        else:
+            obj_prev = obj
+            np.copyto(s_bar, s)
+            np.copyto(u_bar, u)
+            ρ = ρ * 0.85
+        
+        s_prev = s
+
+    if not converged:
+        raise RuntimeError('SCP di not converge!')
+
+    
+
+    u_bar = np.zeros((N, m))
+    s_bar = np.zeros((N + 1, n))
+    s_bar[0] = s0
+    for k in range(N):
+        s_bar[k+1] = fd(s_bar[k], u_bar[k])
+
+
+
+
     prev_pos= initAllSolutions(po, pf, h, K)
 
     upper_bound= max_acceleration
+
+    return s, u
 
     #you need the solve QP part and inequality constraints 
 
