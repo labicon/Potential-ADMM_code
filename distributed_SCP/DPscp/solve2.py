@@ -109,12 +109,12 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
                 constraints += [cvx.pnorm(s_cvx[k,i*6:(i+1)*6]-s_bar[k,i*6:(i+1)*6],'inf') <= ρ]
                 constraints += [cvx.pnorm(u_cvx[k,i*4:(i+1)*4]-u_bar[k,i*4:(i+1)*4],'inf') <= ρ] 
                 
-                constraints += [np.array([-2, -2, -2, 0]) <= u_cvx[k, i*4:(i+1)*4], \
-                            u_cvx[k, i*4:(i+1)*4] <= np.array([2, 2, 2, 15])]
+                constraints += [np.array([-1, -1, -1, 0]) <= u_cvx[k, i*4:(i+1)*4], \
+                            u_cvx[k, i*4:(i+1)*4] <= np.array([1, 1, 1, 10])]
                 
-                #state constraints:
-                constraints+= [np.array([-5., -5. , 0.9, -np.pi/3, -np.pi/3, -np.pi/3, -5., -5., -5., -1.5, -1.5, -1.5]) <= s_cvx[k, i*12:(i+1)*12],\
-                            s_cvx[k, i*12:(i+1)*12] <= np.array([5. , 5. , 4., np.pi/3, np.pi/3, np.pi/3, 5., 5., 5., 1.5, 1.5, 1.5])]
+                # #state constraints:
+                # constraints+= [np.array([-5., -5. , 0.9, -np.pi/3, -np.pi/3, -np.pi/3, -5., -5., -5., -1.5, -1.5, -1.5]) <= s_cvx[k, i*12:(i+1)*12],\
+                #             s_cvx[k, i*12:(i+1)*12] <= np.array([5. , 5. , 4., np.pi/3, np.pi/3, np.pi/3, 5., 5., 5., 1.5, 1.5, 1.5])]
             
                 #linearized collision avoidance constraints
                 if iterate > 0:
@@ -269,7 +269,7 @@ def discretize(f, dt):
     return integrator
 
 
-"""Example with 2 drones, one-shot horizon"""
+"""Run and example"""
 
 n_drones = 1
 n_states = 12
@@ -348,45 +348,48 @@ plt.show()
 
 
 
+"""Run SCP in receding horizon"""
 
-"""TODO: run SCP in receding horizons"""
-# def solve_rhc():
-#     count = 0
-#     si = s0
-#     obj_list = []
+count = 0
+si = s0
+obj_list = []
 
-#     u_bar = np.zeros((N, m))
-#     s_bar = np.zeros((N + 1, n))
-#     s_bar[0] = s0
-#     for k in range(N):
-#         s_bar[k+1] = fd(s_bar[k], u_bar[k])
+N = 15
+u_bar = np.zeros((N, m))
+s_bar = np.zeros((N + 1, n))
+s_bar[0] = s0
+for k in range(N):
+    s_bar[k+1] = fd(s_bar[k], u_bar[k])
 
-#     X_trj =  np.zeros((0, n))  #Full trajectory over entire problem horizon (not just a single prediction horizon)
-#     STEP_SIZE=1
-#     """TODO: the problem is blowing up: objective value grows unbounded somehow"""
-#     while not np.all(dec.distance_to_goal(si, s_goal.reshape(1,-1), n_agents = 2,n_states = 6,n_d= 3) < 0.1) :
-#         s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, si, ru, ρ)
-#         count +=1
-        
-#         obj_list.append(obj)
-        
-#         print(f'current objective value is {obj}!')
+X_trj =  np.zeros((0, n))  #Full trajectory over entire problem horizon (not just a single prediction horizon)
+STEP_SIZE=1
 
-#         si = s[STEP_SIZE,:]
-#         X_trj = np.r_[X_trj, s[:STEP_SIZE]]
+iterate = 0
+s_prev = None
 
-#         u_bar = np.zeros((N, m))
-#         s_bar = np.zeros((N + 1, n))
-#         s_bar[0] = si
-#         for k in range(N):
-#             s_bar[k+1] = fd(s_bar[k], u_bar[k])
+while not np.all(dec.distance_to_goal(si, s_goal.reshape(1,-1), n_agents = 1,n_states = 6,n_d= 3) < 0.1) :
+    s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, si,  ρ, iterate, s_prev, n_drones)
 
-#         if count > 50:
-#             print('max. number of outer iterations reached!')
-#             break
+    s_prev = s
+    
+    np.copyto(s_bar, s)
+    np.copyto(u_bar, u)
+
+    count +=1
+    obj_list.append(obj)
+    
+    print(f'current objective value is {obj}!\n')
+
+    X_trj = np.r_[X_trj, s[:STEP_SIZE]]
+    print(f'X_trj has shape {X_trj.shape}\n')
+
+
+    if count > 60:
+        print('max. number of outer iterations reached!')
+        break
 
 # Plot state and control trajectories
-# print(f'Full trajectory has shape {X_trj.shape}')
-# fig = plt.figure(dpi=200)
-# dec.plot_solve(s,0,s_goal,x_dims,n_d = 3)
-# plt.savefig('2_quad_SCP.png')
+print(f'Full trajectory has shape {X_trj.shape}')
+fig = plt.figure(dpi=200)
+dec.plot_solve(X_trj,0,s_goal,x_dims,n_d = 3)
+plt.savefig('1quad_rhc_SCP.png')
