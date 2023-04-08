@@ -366,7 +366,7 @@ u_try = np.array([0, 0, 0, 4.9,
                   0, 0, 0, 4.9])
 
 dt = 0.1                             # discrete time resolution
-# T = 10. 
+T = 10. 
 x_dims = [n_states]*n_agents
 fd = jax.jit(discretize(multi_Quad_Dynamics,dt))
 
@@ -431,3 +431,7 @@ print(f'Full trajectory has shape {X_trj.shape}')
 fig = plt.figure(dpi=200)
 dec.plot_solve(X_trj,0,s_goal,x_dims,n_d = 3)
 plt.savefig('2_quad_rhc_SCP.png')
+
+fig = plt.figure(dpi=150)
+plt.plot(dec.compute_pairwise_distance(X_trj,x_dims,n_d=3))
+plt.savefig('2_quad_pariwise_distance.png')
