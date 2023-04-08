@@ -226,7 +226,7 @@ def multi_Quad_Dynamics(s, u, x_dims):
     x_ds = []
     for i in range(num_quadrotors):
         
-        tau_x, tau_y, tau_z, f_z = us[0], us[1], us[2], us[3]
+        tau_x, tau_y, tau_z, f_z = us[i][0], us[i][1], us[i][2], us[i][3]
         psi = xs[i][3]
         theta = xs[i][4]
         phi = xs[i][5]
@@ -269,127 +269,165 @@ def discretize(f, dt):
     return integrator
 
 
-"""Run and example"""
+"""Run an one-shot centralized example"""
 
-n_drones = 1
+# n_drones = 1
+# n_states = 12
+# n_controls = 4
+# g = 9.81
+# n = n_drones * n_states                                # total state dimension
+# m = n_drones * n_controls                              # total control dimension
+
+# # s_goal = np.array([-1.5, -1.5, 1.2, 0,  0 , 0, 0, 0, 0, 0, 0 , 0, #drone 1
+# #                    1.5, 1.5, 1.2, 0, 0 , 0, 0, 0, 0, 0, 0, 0 #drone 2
+# #                    ])                                                     
+# # s0 = np.array([0.1, 0.2, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+# #                -0.5, 0.3, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
+
+# s_goal = np.array([-1.5, -1.5, 1.2, 0,  0 , 0, 0, 0, 0, 0, 0 , 0])  # for 1 drone only
+# s0 = np.array([0.1, 0.2, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+
+# dt = 0.1                             # discrete time resolution
+# T = 10.                              # total simulation time
+
+# x_dims = [12, 12]
+# fd = jax.jit(discretize(single_quad_dynamics,dt))
+
+# # SCP parameters
+
+# P = 1e3*np.eye(n)                    # terminal state cost matrix
+# Q = np.eye(n)*10  # state cost matrix
+# R = 1e-3*np.eye(m)                   # control cost matrix
+# ρ = 200                              # trust region parameter
+# tol = 5e-1                           # convergence tolerance
+# max_iters = 100                      # maximum number of SCP iterations
+
+# t = np.arange(0., T + dt, dt)
+# N = t.size - 1
+# # N = 50  
+
+# s, u = solve_scp(fd, P, Q, R, N, s_goal, s0, ρ, tol, max_iters, n_drones)
+
+# # Simulate open-loop control
+# for k in range(N):
+#     s[k+1] = fd(s[k], u[k])
+
+# # Plot state trajectories
+# fig, ax = plt.subplots(1, 3, figsize=(10, 3), dpi=150)
+# ylabels = (r'$x(t)$', r'$y(t)$', r'$z(t)$', r'$tau_x(t)$',r'$tau_y(t)$',r'$tau_z(t)$',r'$f_z(t)$')
+
+# for i in range(3):
+#     ax[i].plot(t, s[:, i], color='tab:blue')
+#     ax[i].axhline(s_goal[i], linestyle='--', color='tab:orange',label='reference position')
+#     ax[i].set_xlabel(r'$t$')
+#     ax[i].set_ylabel(ylabels[i])
+
+# plt.savefig('state_tracking(singleDrone).png',
+#             bbox_inches='tight')
+# plt.show()
+
+# #Plot control trajectories
+# fig, ax = plt.subplots(1, 4, figsize=(10, 3), dpi=150)
+# u_ref_upper = np.array([1, 1, 1, 10])
+# u_ref_lower = np.array([-1, -1, -1, 0])
+
+# for j in range(4):
+
+#     ax[j].plot(t[:-1], u[:, j])
+#     ax[j].axhline(u_ref_upper[j], linestyle='--',label='upper input bound')
+#     ax[j].axhline(u_ref_lower[j], linestyle='--',label='lower input input')
+#     ax[j].set_xlabel(r'$t$')
+#     ax[j].set_ylabel(ylabels[j+3])
+
+
+# plt.savefig('control_tracking(singleDrone).png',
+#             bbox_inches='tight')
+# plt.show()
+
+
+"""Run an example in receding-horizon"""
+n_agents = 2
 n_states = 12
-n_controls = 4
-g = 9.81
-n = n_drones * n_states                                # total state dimension
-m = n_drones * n_controls                              # total control dimension
-
-# s_goal = np.array([-1.5, -1.5, 1.2, 0,  0 , 0, 0, 0, 0, 0, 0 , 0, #drone 1
-#                    1.5, 1.5, 1.2, 0, 0 , 0, 0, 0, 0, 0, 0, 0 #drone 2
-#                    ])                                                     
-# s0 = np.array([0.1, 0.2, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-#                -0.5, 0.3, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
-
-s_goal = np.array([-1.5, -1.5, 1.2, 0,  0 , 0, 0, 0, 0, 0, 0 , 0])  # for 1 drone only
-s0 = np.array([0.1, 0.2, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-
-
-dt = 0.1                             # discrete time resolution
-T = 10.                              # total simulation time
-
-x_dims = [12, 12]
-# fd = jax.jit(discretize(multi_Quad_Dynamics,dt))
-fd = jax.jit(discretize(single_quad_dynamics,dt))
-
-# SCP parameters
-
-P = 1e3*np.eye(n)                    # terminal state cost matrix
-Q = np.eye(n)*10  # state cost matrix
-R = 1e-3*np.eye(m)                   # control cost matrix
-ρ = 200                              # trust region parameter
-tol = 5e-1                           # convergence tolerance
-max_iters = 100                      # maximum number of SCP iterations
-
-t = np.arange(0., T + dt, dt)
-N = t.size - 1
-# N = 50  
-
-s, u = solve_scp(fd, P, Q, R, N, s_goal, s0, ρ, tol, max_iters, n_drones)
-
-# Simulate open-loop control
-for k in range(N):
-    s[k+1] = fd(s[k], u[k])
-
-# Plot state trajectories
-fig, ax = plt.subplots(1, 3, figsize=(10, 3), dpi=150)
-ylabels = (r'$x(t)$', r'$y(t)$', r'$z(t)$', r'$tau_x(t)$',r'$tau_y(t)$',r'$tau_z(t)$',r'$f_z(t)$')
-
-for i in range(3):
-    ax[i].plot(t, s[:, i], color='tab:blue')
-    ax[i].axhline(s_goal[i], linestyle='--', color='tab:orange',label='reference position')
-    ax[i].set_xlabel(r'$t$')
-    ax[i].set_ylabel(ylabels[i])
-
-plt.savefig('state_tracking(singleDrone).png',
-            bbox_inches='tight')
-plt.show()
-
-#Plot control trajectories
-fig, ax = plt.subplots(1, 4, figsize=(10, 3), dpi=150)
-u_ref_upper = np.array([1, 1, 1, 10])
-u_ref_lower = np.array([-1, -1, -1, 0])
-
-for j in range(4):
-
-    ax[j].plot(t[:-1], u[:, j])
-    ax[j].axhline(u_ref_upper[j], linestyle='--',label='upper input bound')
-    ax[j].axhline(u_ref_lower[j], linestyle='--',label='lower input input')
-    ax[j].set_xlabel(r'$t$')
-    ax[j].set_ylabel(ylabels[j+3])
-
-
-plt.savefig('control_tracking(singleDrone).png',
-            bbox_inches='tight')
-plt.show()
-
-
-
-"""Run SCP in receding horizon"""
-
+n_inputs=  4
 count = 0
-si = s0
+
 obj_list = []
 
+P = 1e3*np.eye(n_agents*n_states)                    # terminal state cost matrix
+Q = np.eye(n_agents*n_states)*10  # state cost matrix
+R = 1e-3*np.eye(n_agents*n_inputs)                   # control cost matrix
+ρ = 200                
+
 N = 15
-u_bar = np.zeros((N, m))
-s_bar = np.zeros((N + 1, n))
+# u_try = np.array([0, 0, 0, 4.9])
+
+u_try = np.array([0, 0, 0, 4.9,
+                  0, 0, 0, 4.9])
+
+dt = 0.1                             # discrete time resolution
+# T = 10. 
+x_dims = [n_states]*n_agents
+fd = jax.jit(discretize(multi_Quad_Dynamics,dt))
+
+
+s_goal = np.array([-1.5, -1.5, 1.2, 0,  0 , 0, 0, 0, 0, 0, 0 , 0, #drone 1
+                   1.5, 1.5, 1.2, 0, 0 , 0, 0, 0, 0, 0, 0, 0 #drone 2
+                   ])                                                     
+s0 = np.array([0.1, 0.2, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+               -0.5, 0.3, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0])  
+
+
+u_bar = np.tile(u_try ,(N,1))
+s_bar = np.zeros((N + 1, n_agents*n_states))
 s_bar[0] = s0
 for k in range(N):
     s_bar[k+1] = fd(s_bar[k], u_bar[k])
 
-X_trj =  np.zeros((0, n))  #Full trajectory over entire problem horizon (not just a single prediction horizon)
+X_trj =  np.zeros((0, n_agents*n_states))  #Full trajectory over entire problem horizon (not just a single prediction horizon)
 STEP_SIZE=1
 
 iterate = 0
 s_prev = None
+obj_prev = np.inf
+tol = 5e-1
 
-while not np.all(dec.distance_to_goal(si, s_goal.reshape(1,-1), n_agents = 1,n_states = 6,n_d= 3) < 0.1) :
-    s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, si,  ρ, iterate, s_prev, n_drones)
+si = s0
+while not np.all(dec.distance_to_goal(si, s_goal.reshape(1,-1), n_agents ,n_states,n_d= 3) < 0.1) :
+    s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, si,  ρ, iterate, s_prev, n_agents)
 
     s_prev = s
     
-    np.copyto(s_bar, s)
-    np.copyto(u_bar, u)
-
-    count +=1
-    obj_list.append(obj)
-    
-    print(f'current objective value is {obj}!\n')
-
-    X_trj = np.r_[X_trj, s[:STEP_SIZE]]
-    print(f'X_trj has shape {X_trj.shape}\n')
-
-
-    if count > 60:
-        print('max. number of outer iterations reached!')
+    diff_obj = np.abs(obj - obj_prev)
+    print(f'current diff_obj is {diff_obj}')
+    if diff_obj < tol:
+            
+        print('SCP converged')
         break
+    
+    else:
+        obj_prev = obj
+        #Re-initialize nominal trajectory to shift prediction horizon
+        s_bar = np.zeros((N + 1, n_agents*n_states))
+        s_bar[0] = s[STEP_SIZE]
+        u_bar = np.tile(u_try ,(N,1))
+        u_bar[0] = u[STEP_SIZE-1]
+
+        count +=1
+        
+        obj_list.append(obj)
+        
+        print(f'current objective value is {obj}!\n')
+
+        X_trj = np.r_[X_trj, s[:STEP_SIZE]]
+        print(f'X_trj has shape {X_trj.shape}\n')
+
+        if count >=60:
+            print('max iteration reached')
+            break
 
 # Plot state and control trajectories
 print(f'Full trajectory has shape {X_trj.shape}')
 fig = plt.figure(dpi=200)
 dec.plot_solve(X_trj,0,s_goal,x_dims,n_d = 3)
-plt.savefig('1quad_rhc_SCP.png')
+plt.savefig('2_quad_rhc_SCP.png')
