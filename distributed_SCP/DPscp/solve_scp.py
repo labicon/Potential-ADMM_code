@@ -136,8 +136,8 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
                     curr_pos = [s_cvx[k][id:id+6] for id in range(0, len(s_prev[k]), 6)]
                     for j in range(n_drones):
                         if j != i:
-                            constraints+= [cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3]) + \
-                                        (prev_pos[i][0:3].T-prev_pos[j][0:3].T)/cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3])
+                            constraints+= [cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3], 1) + \
+                                        (prev_pos[i][0:3].T-prev_pos[j][0:3].T)/cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3], 1)
                                             @ (curr_pos[i][0:3]-curr_pos[j][0:3]) >= collision_radius]
                             
         else: #in case we want to test our code with a single drone
