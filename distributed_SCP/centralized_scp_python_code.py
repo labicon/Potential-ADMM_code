@@ -19,7 +19,7 @@ from scipy.optimize import quadratic_assignment
 
 
 
-T_duration= 15
+T_duration= 15 
 dt= 0.01
 
 range_possible_pos= np.array([[-3, 3], [-3, 3], [-3, 3]])
@@ -134,7 +134,26 @@ def solve_scp(fd: callable,
     return s, u
 
 
+def states (po, a, A_p, A_v, k, n):
 
+    v_o = np.array([0, 0, 0, 0, 0, 0,0])
+    po = np.squeeze(po)
+
+    p = np.zeros((6*K, N))
+    v = np.zeros((6*K, N))
+    a = np.zeros((6, K, N))
+
+    for i in range(N):
+        ai = atot[6*K*(i-1):6*K*i]
+        a[:, :, i] = np.reshape(ai, (6, K), order='F')
+        new_p = A_p.dot(ai)
+        new_v = A_v.dot(ai)
+        pi = np.vstack((po[:, i], new_p + np.tile(po[:, i], (K-1, 1))))
+        vi = np.vstack((vo, new_v))
+        p[:, i] = np.reshape(pi, (6*K,), order='F')
+        v[:, i] = np.reshape(vi, (6*K,), order='F')
+
+    return p, v, a
 
 #success = exitflag
 #p, v, a = getStates(po, atot, A_p, A_v, K, N)
@@ -175,7 +194,7 @@ def centralizedSCP (po,pf,h,K,N,pmin,pmax,rmin,alim,A_p, A_v,E1,E2,order):
         s_prev = s
 
     if not converged:
-        raise RuntimeError('SCP di not converge!')
+        raise RuntimeError('SCP did not converge!')
 
     
 
@@ -241,7 +260,7 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
                   #      constraints+= [cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3]) + \
                    #                 (prev_pos[i][0:3].T-prev_pos[j][0:3].T)/cvx.norm(prev_pos[i][0:3]-prev_pos[j][0:3]) \
                     #                * (curr_pos[i][0:3]-curr_pos[j][0:3]) >= COLLISION_RADIUS]
-            ρ=        
+            #ρ=        
     
       
 
