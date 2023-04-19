@@ -207,7 +207,7 @@ def single_quad_dynamics(s, u, x_dims):
     w_z = s[11]
 
     #model is derived after plugging into physical parameters found via sys ID
-    #see https://github.com/RandyChen233/AE483_Autonomous_Control_Lab/blob/main/lab05/analysis_part1.ipynb
+    #see https://github.com/tbretl/ae353-sp22/blob/main/projects/04_drone/DeriveEOM-Template.ipynb
     x_d = jnp.array([
         v_x*jnp.cos(psi)*jnp.cos(theta) + v_y*(jnp.sin(phi)*jnp.sin(theta)*jnp.cos(psi) - jnp.sin(psi)*jnp.cos(phi)) + v_z*(jnp.sin(phi)*jnp.sin(psi) + jnp.sin(theta)*jnp.cos(phi)*jnp.cos(psi)),
         v_x*jnp.sin(psi)*jnp.cos(theta) + v_y*(jnp.sin(phi)*jnp.sin(psi)*jnp.sin(theta) + jnp.cos(phi)*jnp.cos(psi)) - v_z*(jnp.sin(phi)*jnp.cos(psi) - jnp.sin(psi)*jnp.sin(theta)*jnp.cos(phi)), 

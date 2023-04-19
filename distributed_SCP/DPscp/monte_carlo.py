@@ -146,7 +146,6 @@ def setup_logger():
     )
 
 
-
 def monte_carlo_analysis():
     """Benchmark to evaluate algorithm over many random initial conditions"""
 
@@ -154,8 +153,8 @@ def monte_carlo_analysis():
 
     n_trials_iter = range(30)
 
-    # n_agents_iter = [3,4,5,6,7,8,9,10]
-    n_agents_iter = [8,9,10]
+    n_agents_iter = [3,4,5,6,7,8,9,10]
+    # n_agents_iter = [8,9,10]
 
     dt = 0.1
     N = 10
