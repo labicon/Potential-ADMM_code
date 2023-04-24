@@ -104,8 +104,7 @@ def run_scp_rhc(i_trial, n_agents, n_states, n_inputs, N, dt, s_goal, s0, step_s
     logging.info(
             f'{i_trial},'
             f'{n_agents},{converged},'
-            f'{objective_val},{N},{dt},{radius},{t_solve_step_avg},'
-            f'{distance_to_goal},'
+            f'{objective_val},{N},{dt},{radius},{t_solve_step_avg},{distance_to_goal},'
         )
 
     return X_trj, U_trj
@@ -130,7 +129,8 @@ def setup_logger():
     
     # if centralized == True:
         
-    LOG_PATH = Path(__file__).parent.parent / "logs"
+    LOG_PATH = Path(__file__).parent.parent / "log"
+
     LOG_FILE = LOG_PATH / strftime(
         "rhc-scp-_%m-%d-%y_%H.%M.%S_{getpid()}.csv"
     )
@@ -138,11 +138,9 @@ def setup_logger():
         LOG_PATH.mkdir()
         
     print(f"Logging results to {LOG_FILE}")
-    logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
-    
+    logging.basicConfig(filename=LOG_FILE, format='%(asctime)s %(levelname)s:%(name)s:%(message)s', level=logging.INFO)
     logging.info(
-        "i_trial,n_agents,converged,objective_val,N,dt,radius,\
-        t_solve_step, dist_to_goal"
+        "i_trial,n_agents,converged,objective_val,N,dt,radius,t_solve_step, dist_to_goal"
     )
 
 
