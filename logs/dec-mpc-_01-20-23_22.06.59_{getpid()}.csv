@@ -1,2 +1,0 @@
-i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,ids,radius,centralized,t_solve
-0,3,2.9000000000000012,0,True,17.869198793457763,10,0.1,"[100, 101, 102]",0.4,False,7.460049799992703,

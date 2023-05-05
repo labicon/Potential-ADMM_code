@@ -5,9 +5,10 @@ from casadi import *
 import logging
 from time import perf_counter
 
-from util import (
+from .util import (
     compute_pairwise_distance,
     compute_pairwise_distance_Sym,
+    compute_pairwise_distance_nd_Sym,
     define_inter_graph_threshold,
     distance_to_goal,
     split_graph, 
@@ -26,14 +27,15 @@ def solve_rhc(dt,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     #N is the shifting prediction horizon
     
     p_opts = {"expand":True}
-    s_opts = {"max_iter": 200,"print_level":0}
+    s_opts = {"max_iter": 200,"print_level":4}
     
     
-    M = 100  # this is the maximum number of outer iterations
+    M = 35  # this is the maximum number of outer iterations
  
     n_x = n_agents*n_states
     n_u = n_agents*n_inputs
     x_dims = [n_states]*n_agents
+    n_dims = [3]*n_agents
    
     if n_humans!=0:
         f = generate_f_human_drone(x_dims,n_humans)
@@ -45,14 +47,14 @@ def solve_rhc(dt,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     
     t = 0
 
-    J_list = []
-    J_list.append(np.inf)
+
     # for i in range(M) :
     i = 0
 
     failed_count = 0
     converged = False
 
+    t_solve_per_step = []
     
     t_solve_start = perf_counter()
     while not np.all(distance_to_goal(x0,xf,n_agents,n_states) < 0.1)  and (i < M):
@@ -88,7 +90,8 @@ def solve_rhc(dt,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
 
         #collision avoidance constraints
         for k in range(N+1):
-            distances = compute_pairwise_distance_Sym(X[:,k], x_dims)
+            # distances = compute_pairwise_distance_Sym(X[:,k], x_dims) this function is deprecated
+            distances = compute_pairwise_distance_nd_Sym(X[:,k], x_dims, n_dims)
             for n in range(len(distances)):
                 opti.subject_to(distances[n] >= radius)
                 
@@ -107,10 +110,13 @@ def solve_rhc(dt,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         opti.solver("ipopt",p_opts,
                     s_opts) 
         
+        
         try:
-            
+            t_solve_step_start = perf_counter()    
             sol = opti.solve()
-            
+            t_solve_step = perf_counter() - t_solve_step_start   
+            t_solve_per_step.append(t_solve_step)
+
         except RuntimeError:
             t_solve = None
             print('Current problem is infeasible \n')
@@ -122,7 +128,7 @@ def solve_rhc(dt,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
             f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},'
                 )
         
-            return X_full,U_full, t, J_list, failed_count, converged
+            return X_full,U_full, t, failed_count, converged
             # break
       
             
@@ -130,11 +136,7 @@ def solve_rhc(dt,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
         x0 = sol.value(X)[:,1].reshape(-1,1)
 
         u_sol = sol.value(U)[:,0]
-        objective_val = sol.value(cost_fun)
-        J_list.append(objective_val)
-        print(f'current objective function value is {objective_val}')
-         
-        
+ 
         #Store the trajectory
         
         X_full = np.r_[X_full, x0.reshape(1,-1)]
@@ -152,14 +154,15 @@ def solve_rhc(dt,x0,xf,u_ref,N,Q,R,Qf,n_agents,n_states,n_inputs,radius,
     t_solve_end = perf_counter()
     t_solve = t_solve_end-t_solve_start
 
-            
+    objective_val = objective(X_full.T,U_full.T,u_ref,xf,Q,R,Qf)
+    print(f'current overal game cost is {objective_val}')
             
     logging.info(
     f'{j_trial},'
     f'{n_agents},{t},{failed_count},{converged},'
-    f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},'
+    f'{objective_val},{N},{dt},{radius},{centralized},{t_solve},{np.mean(t_solve_per_step)},{distance_to_goal(x0, xf, n_agents, n_states)},'
         )
     
         
-    return X_full,U_full, t, J_list, failed_count, converged
+    return X_full,U_full, t, failed_count, converged
 

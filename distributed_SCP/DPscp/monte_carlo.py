@@ -1,3 +1,10 @@
+import logging
+from pathlib import Path
+import multiprocessing as mp
+from os import getpid
+import os
+from time import strftime, perf_counter
+
 import numpy as np
 import cvxpy as cvx
 import jax
@@ -8,12 +15,6 @@ from functools import partial
 import dpilqr as dec
 from solve_scp import *
 
-import logging
-from pathlib import Path
-import multiprocessing as mp
-from os import getpid
-import os
-from time import strftime, perf_counter
 
 
 def run_scp_rhc(i_trial, n_agents, n_states, n_inputs, N, dt, s_goal, s0, step_size, radius):
@@ -129,7 +130,7 @@ def setup_logger():
     
     # if centralized == True:
         
-    LOG_PATH = Path(__file__).parent.parent / "log"
+    LOG_PATH = Path(__file__).parent.parent / "logs"
 
     LOG_FILE = LOG_PATH / strftime(
         "rhc-scp-_%m-%d-%y_%H.%M.%S_{getpid()}.csv"
@@ -138,7 +139,7 @@ def setup_logger():
         LOG_PATH.mkdir()
         
     print(f"Logging results to {LOG_FILE}")
-    logging.basicConfig(filename=LOG_FILE, format='%(asctime)s %(levelname)s:%(name)s:%(message)s', level=logging.INFO)
+    logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
     logging.info(
         "i_trial,n_agents,converged,objective_val,N,dt,radius,t_solve_step, dist_to_goal"
     )

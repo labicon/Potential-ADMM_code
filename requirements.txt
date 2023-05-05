@@ -1,4 +1,4 @@
-casadi==3.5.5.post2
+casadi==3.5.5
 matplotlib==3.5.1
 numpy==1.22.3
 scipy==1.9.1

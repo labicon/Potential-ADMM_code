@@ -2,14 +2,6 @@
 
 """Benchmark of the performance of centralized vs. decentralized potential iLQR
 
-We conduct two primary analyses in this script, namely:
-1. Allow unlimited solve time and stop after the solver converges or diverges.
-2. Cap the solve time based on a "real-time" constraint.
-
-The objective in 1 is to contrast solve times, whereas in 2 we contrast trajectory
-quality in a real-time application of the algorithm. For both cases, we utilize
-uniform random initial positions with stationary agents.
-
 """
 
 import logging
@@ -21,11 +13,11 @@ from time import strftime
 
 import numpy as np
 
-from util import *
-import util
+from solvers.util import *
+import solvers.util 
 from dpilqr import random_setup
-from distributed_mpc import *
-from centralized_mpc import *
+from solvers.distributed_mpc import *
+from solvers.centralized_mpc import *
 
 #Define simulation parameters:
 theta_max = np.pi / 6
@@ -64,35 +56,35 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
     """Single simulation comparing the centralized and decentralized solvers"""
     
     if n_agents == 3:
-        x0,xf = util.setup_3_quads()
+        x0,xf = solvers.util.setup_3_quads()
         n_dims = [3]*3
 
     elif n_agents==4:
-        x0, xf=util.setup_4_quads()
+        x0, xf=solvers.util.setup_4_quads()
         n_dims=[3]*4
 
     elif n_agents == 5:
-        x0,xf = util.setup_5_quads()
+        x0,xf = solvers.util.setup_5_quads()
         n_dims = [3]*5
 
     elif n_agents==6:
-        x0, xf=util.setup_6_quads()
+        x0, xf=solvers.util.setup_6_quads()
         n_dims= [3]*6
 
     elif n_agents==7:
-        x0, xf=util.setup_7_quads()
+        x0, xf=solvers.util.setup_7_quads()
         n_dims= [3]*7
 
     elif n_agents==8:
-        x0, xf= util.setup_8_quads()
+        x0, xf= solvers.util.setup_8_quads()
         n_dims= [3]*8
 
     elif n_agents==9:
-        x0, xf=util.setup_9_quads()
+        x0, xf=solvers.util.setup_9_quads()
         n_dims= [3]*9
 
     elif n_agents == 10:
-        x0,xf = util.setup_10_quads()
+        x0,xf = solvers.util.setup_10_quads()
         n_dims = [3]*10
     
     ids = [100 + i for i in range(n_agents)]
@@ -101,7 +93,7 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
     R = np.eye(n_inputs*n_agents) * 0.01
 
     Qf = 1000.0 * np.eye(Q.shape[0])
-    
+
     
     max_input = np.tile(max_input_base,n_agents)
     min_input = np.tile(min_input_base,n_agents)
@@ -111,59 +103,47 @@ def multi_agent_run(trial, n_agents,dt, N, radius, centralized = False):
     u_ref = np.tile(u_ref_base,n_agents)
    
     # Solve the problem centralized.
-    if centralized == True:
-        print("\t\t\tcentralized")
+    # if centralized == True:
+        # print("\t\t\tcentralized")
         
         
-        Xc, Uc, tc , J_c, failed_count, converged = solve_rhc(dt,x0,xf,u_ref,
-                               N,Q,R,Qf,n_agents,
-                               n_states,n_inputs,
-                               radius,max_input,
-                               min_input,max_state,
-                               min_state,0,trial)
+    Xc, Uc, tc , failed_count, converged = solve_rhc(dt,x0,xf,u_ref,
+                            N,Q,R,Qf,n_agents,
+                            n_states,n_inputs,
+                            radius,max_input,
+                            min_input,max_state,
+                            min_state,0,trial)
 
         
-    else:
-        print("\t\t\tdistributed")
+    # else:
+        # print("\t\t\tdistributed")
         #no humans are involved in the monte carlo simulations
-        Xd, Ud, td, J_d , failed_count, converged = solve_rhc_distributed(
-                dt,x0, xf, u_ref, N,  
-                n_agents, n_states, n_inputs, radius, ids,
-                x_min,x_max,y_min,y_max,z_min,z_max,v_min,
-                v_max,theta_max,
-                theta_min,tau_max,
-                tau_min,phi_max,phi_min,0,n_dims,trial
-                                )
+    Xd, Ud, td,  failed_count, converged = solve_rhc_distributed(
+            dt,x0, xf, u_ref, N, Q, R, Qf,  
+            n_agents, n_states, n_inputs, radius, ids,
+            x_min,x_max,y_min,y_max,z_min,z_max,v_min,
+            v_max,theta_max,
+            theta_min,tau_max,
+            tau_min,phi_max,phi_min,0,n_dims,trial
+                            )
 
 def setup_logger(centralized=False):
     
-    if centralized == True:
+    # if centralized == True:
         
-        LOG_PATH = Path(__file__).parent.parent / "logs"
-        LOG_FILE = LOG_PATH / strftime(
-            "cen-mpc-_%m-%d-%y_%H.%M.%S_{getpid()}.csv"
-        )
-        if not LOG_PATH.is_dir():
-            LOG_PATH.mkdir()
-        print(f"Logging results to {LOG_FILE}")
-        logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
-        logging.info(
-            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,radius,centralized,t_solve"
-        )
+    LOG_PATH = Path(__file__).parent.parent / "logs"
+    LOG_FILE = LOG_PATH / strftime(
+        "cen-mpc-_%m-%d-%y_%H.%M.%S_{getpid()}.csv"
+    )
+    if not LOG_PATH.is_dir():
+        LOG_PATH.mkdir()
+    print(f"Logging results to {LOG_FILE}")
+    logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
+    logging.info(
+        "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,radius,\
+        centralized,t_solve, t_solve_step, dist_to_goal"
+    )
         
-    else:
-    
-        LOG_PATH = Path(__file__).parent.parent / "logs"
-        LOG_FILE = LOG_PATH / strftime(
-            "dec-mpc-_%m-%d-%y_%H.%M.%S_{getpid()}.csv"
-        )
-        if not LOG_PATH.is_dir():
-            LOG_PATH.mkdir()
-        print(f"Logging results to {LOG_FILE}")
-        logging.basicConfig(filename=LOG_FILE, format="%(message)s", level=logging.INFO)
-        logging.info(
-            "i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,ids,radius,centralized,t_solve"
-        )
 
 def monte_carlo_analysis():
     """Benchmark to evaluate algorithm over many random initial conditions"""
@@ -172,11 +152,13 @@ def monte_carlo_analysis():
 
     n_trials_iter = range(30)
 
-    n_agents_iter = [3,4,5,6,7,8,9,10]
+    # n_agents_iter = [3,4,5,6,7,8,9,10]
+    # n_agents_iter = [9,10]
+    n_agents_iter = [9,10]
     #Note: somehow with 6 drones the centralized simulation does not converge even once!
 
     dt = 0.1
-    N = 10
+    N = 15
     radius = 0.4
     
     # Change the for loops into multi-processing?
@@ -186,10 +168,10 @@ def monte_carlo_analysis():
         if n_agents >=5 and n_agents <=8:
             radius = 0.25
         
-        if n_agents >8 and n_agents <=10:
+        if n_agents >8 and n_agents <9:
             radius = 0.2
-            
-        if n_agents > 10:
+
+        if n_agents >= 9:
             radius = 0.1
             
         for i_trial in n_trials_iter:
@@ -197,7 +179,7 @@ def monte_carlo_analysis():
             
             multi_agent_run(
                 i_trial, n_agents, dt, N, radius, 
-                 centralized=False)
+                 centralized=True)
           
     
 def main():

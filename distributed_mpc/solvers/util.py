@@ -113,7 +113,7 @@ def setup_5_quads():
 
 def setup_6_quads():
 
-    x0,xf = random_setup(6,6,n_d=3,energy=5,var=2.5)
+    x0,xf = random_setup(6,6,n_d=3,energy=6,var=3.0)
     
     for i in range(2,len(x0),6):
         if x0[i] <= 0.5:
@@ -121,6 +121,22 @@ def setup_6_quads():
 
         if xf[i] <= 0.5:
             xf[i] = 1.1 + np.random.rand(1,)*0.5
+
+    # x0 = np.array([[0.5, 1.5, 1, 0.1, 0.0, 0,
+    #                 2.5, 1.5, 1, -0.1, 0.0, 0,
+    #                 1.5, 1.3, 1, 0, 0.1, 0,
+    #                 0.5, 1.0, 1, 0.1, 0, 0,
+    #                 1.2, -0.5, 1, 0, 0, 0,
+    #                 -1.0, 0.8, 1, 0, 0, 0]]).T
+    # xf = np.array([[2.5, 1.5, 1, 0, 0, 0,
+    #                 0.5, 1.5, 1, 0, 0, 0,
+    #                 1.5, 2.2, 1, 0, 0, 0,
+    #                 -0.5, -0.6, 1, 0, 0, 0,
+    #                 -0.7, 1.0, 1, 0, 0, 0,
+    #                 0.5, -1.5, 1, 0., 0, 0]]).T
+
+    # x0[dec.pos_mask([6]*6, 3)] += 0.1*np.random.randn(18, 1)
+    # xf[dec.pos_mask([6]*6, 3)] += 0.1*np.random.randn(18, 1)
 
     return x0, xf
 
@@ -164,7 +180,7 @@ def setup_9_quads():
 
 def setup_10_quads():
     
-    x0,xf = random_setup(10,6,n_d=3,energy=8,var=3.0)
+    x0,xf = random_setup(10,6,n_d=3,energy=10,var=3.0)
     
     for i in range(2,len(x0),6):
         if x0[i] <= 0.5:
@@ -438,6 +454,7 @@ def compute_pairwise_distance_Sym(X, x_dims, n_d=3):
     if n_agents > 5:
     
         dX = X_agent.T[:n_d, pair_inds[:, 0]] - X_agent.T[:n_d, pair_inds[:, 1]]
+        # dX = X_agent[:n_d, pair_inds[:, 0]] - X_agent[:n_d, pair_inds[:, 1]]
         for j in range(dX.shape[1]):
             distances.append(sqrt(dX[0,j]**2+dX[1,j]**2+dX[2,j]**2 + eps))
 

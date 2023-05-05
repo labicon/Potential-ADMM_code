@@ -1,11 +1,11 @@
 import casadi as cs
 import numpy as np
 from scipy.constants import g
-from util import *
-import util
-from centralized_mpc import solve_rhc
-from distributed_mpc import solve_rhc_distributed
-from distributed_mpc_soft import solve_rhc_distributed_soft
+from solvers.util import *
+import solvers.util as util
+from solvers.centralized_mpc import solve_rhc
+from solvers.distributed_mpc import solve_rhc_distributed
+from solvers.distributed_mpc_soft import solve_rhc_distributed_soft
 """ 
 Define simulation parameters
 
@@ -167,3 +167,4 @@ if __name__ == "__main__" :
                                                 )
             
     np.save(file_name, X_full,U_full,t)
+    
