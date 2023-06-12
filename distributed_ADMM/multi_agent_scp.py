@@ -8,8 +8,38 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 from time import perf_counter
-from solve_scp import objective
+from scipy import sparse
 
+def objective(s, u, s_goal, N, Q, R, P):
+    """Numerically evaluate the quadratic cost of a given state and input trajectory"""
+    objective = 0
+    for k in range(N):
+        objective += (s[k,:] - s_goal).T@Q@(s[k,:] - s_goal) \
+        + u[k,:].T @ R @ u[k,:]
+
+    objective += (s[-1,:] - s_goal).T@ P @(s[-1,:] - s_goal)
+
+    return objective
+
+
+def objective_admm(y_aug, s_goal, N, Q, R, P):
+    
+    """Compact form of quadratic tracking cost"""
+    """y_aug: (x(0),x(1),...,x(N),u(0),...,u(N-1))"""
+    objective = 0
+    H = sparse.block_diag([sparse.kron(sparse.eye(N), Q), P,
+                       sparse.kron(sparse.eye(N), R),], format='csc')
+    # Quadratic objective
+    P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), P,
+                       sparse.kron(sparse.eye(N), R)], format='csc')
+    # linear objective
+    q = np.hstack([np.kron(np.ones(N), -Q@s_goal.flatten()), -P@s_goal.flatten(), np.zeros(N*nu)])
+    print(f'q has shape {q.shape}')
+    objective += cp.quad_form(y_aug, H) + q.T @ y_aug
+    
+    return objective
+    
+    
 @partial(jax.jit, static_argnums=(0,))
 @partial(jax.vmap, in_axes=(None, 0, 0))
 def linearize(fd: callable,
@@ -36,7 +66,8 @@ def solve_scp(fd: callable,
                       tol: float,
                       max_iters: int,
                       n_drones: int,
-                      coll_radius: float):
+                      coll_radius: float,
+                      objective):
     """This function is used for one-shot optimization"""
     n = Q.shape[0]  # state dimension
     m = R.shape[0]  # control dimension
@@ -57,7 +88,7 @@ def solve_scp(fd: callable,
     s_prev = None
     for i in (prog_bar := tqdm(range(max_iters))):
         s, u, obj = scp_iteration(fd, P, Q, R, N, s_bar, u_bar, s_goal, s0,
-                                 ρ, iterate, s_prev, n_drones, coll_radius)
+                                 ρ, iterate, s_prev, n_drones, coll_radius, objective)
         
         iterate+=1
 
@@ -72,7 +103,7 @@ def solve_scp(fd: callable,
             obj_prev = obj
             np.copyto(s_bar, s)
             np.copyto(u_bar, u)
-            # ρ = ρ * 0.85
+            ρ = ρ * 0.85
         
         s_prev = s
 
@@ -82,11 +113,11 @@ def solve_scp(fd: callable,
     return s, u
 
 
-def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
+def scp_iteration(y_state, rho, xbar, u_lagrange, fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
                   N: int, s_bar: np.ndarray, u_bar: np.ndarray,
                   s_goal: np.ndarray, s0: np.ndarray,
                   ρ: float, iterate: int, s_prev: np.ndarray, n_drones: int, collision_radius: float,
-                  ):
+                  objective):
     """Solve a single SCP sub-problem for the cart-pole swing-up problem."""
     A, B, c = linearize(fd, s_bar[:-1], u_bar)
     A, B, c = np.array(A), np.array(B), np.array(c)
@@ -97,19 +128,18 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
     
     s_cvx = cp.Variable((N + 1, n))
     u_cvx = cp.Variable((N, m))
-
-    objective = 0.
-
+    
+    objective = objective(s_cvx, u_cvx, s_goal, N, Q, R, P)
     constraints = []
     constraints +=[s_cvx[0,:] == s_bar[0]]
     
+    objective += (rho/2)*cp.sum_squares(y_state.flatten() - xbar + u)
     for k in range(N-1):
         objective += cp.quad_form(u_cvx[k+1,:]-u_cvx[k,:], np.eye(m))
     
-
     for k in range(N):
         
-        objective += cp.quad_form(s_cvx[k,:] - s_goal, Q) + cp.quad_form(u_cvx[k,:], R) 
+        # objective += cp.quad_form(s_cvx[k,:] - s_goal, Q) + cp.quad_form(u_cvx[k,:], R) 
         constraints += [s_cvx[k+1,:] == A[k]@s_cvx[k,:] + B[k]@u_cvx[k,:] ]
 
         #Adding constraints for each quadrotor:
@@ -146,10 +176,10 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
             constraints += [cp.pnorm(u_cvx[k,:]-u_bar[k,:],'inf') <= ρ] 
 
 
-    objective += cp.quad_form(s_cvx[-1,:] - s_goal, P)
+    # objective += cp.quad_form(s_cvx[-1,:] - s_goal, P)
     print(f'total number of constraints is {len(constraints)}')
     prob = cp.Problem(cp.Minimize(objective), constraints)
-    prob.solve(verbose = True)  
+    prob.solve(verbose = False)  
     
     if prob.status != 'optimal':
         raise RuntimeError('SCP solve failed. Problem status: ' + prob.status)
