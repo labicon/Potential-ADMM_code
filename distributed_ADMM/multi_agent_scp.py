@@ -22,20 +22,21 @@ def objective(s, u, s_goal, N, Q, R, P):
     return objective
 
 
-def objective_admm(y_aug, s_goal, N, Q, R, P):
+def objective_admm(y_state, nx, nu, s_goal, N, Q, R, Qf):
     
     """Compact form of quadratic tracking cost"""
     """y_aug: (x(0),x(1),...,x(N),u(0),...,u(N-1))"""
+    y_aug = y_state
+    
     objective = 0
-    H = sparse.block_diag([sparse.kron(sparse.eye(N), Q), P,
-                       sparse.kron(sparse.eye(N), R),], format='csc')
+    
     # Quadratic objective
-    P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), P,
+    P = sparse.block_diag([sparse.kron(sparse.eye(N), Q), Qf,
                        sparse.kron(sparse.eye(N), R)], format='csc')
     # linear objective
-    q = np.hstack([np.kron(np.ones(N), -Q@s_goal.flatten()), -P@s_goal.flatten(), np.zeros(N*nu)])
-    print(f'q has shape {q.shape}')
-    objective += cp.quad_form(y_aug, H) + q.T @ y_aug
+    q = np.hstack([np.kron(np.ones(N), -Q@s_goal.flatten()), -Qf@s_goal.flatten(), np.zeros(N*nu)])
+
+    objective += cp.quad_form(y_aug, P) + q.T @ y_aug
     
     return objective
     
@@ -56,18 +57,18 @@ def linearize(fd: callable,
     return A, B, c
 
 def solve_scp(fd: callable,
-                      P: np.ndarray,
-                      Q: np.ndarray,
-                      R: np.ndarray,
-                      N: int,
-                      s_goal: np.ndarray,
-                      s0: np.ndarray,
-                      ρ: float,
-                      tol: float,
-                      max_iters: int,
-                      n_drones: int,
-                      coll_radius: float,
-                      objective):
+              P: np.ndarray,
+              Q: np.ndarray,
+              R: np.ndarray,
+              N: int,
+              s_goal: np.ndarray,
+              s0: np.ndarray,
+              ρ: float,
+              tol: float,
+              max_iters: int,
+              n_drones: int,
+              coll_radius: float,
+              objective):
     """This function is used for one-shot optimization"""
     n = Q.shape[0]  # state dimension
     m = R.shape[0]  # control dimension
@@ -113,11 +114,10 @@ def solve_scp(fd: callable,
     return s, u
 
 
-def scp_iteration(y_state, rho, xbar, u_lagrange, fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
+def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
                   N: int, s_bar: np.ndarray, u_bar: np.ndarray,
                   s_goal: np.ndarray, s0: np.ndarray,
-                  ρ: float, iterate: int, s_prev: np.ndarray, n_drones: int, collision_radius: float,
-                  objective):
+                  ρ: float, iterate: int, s_prev: np.ndarray, n_drones: int, collision_radius: float):
     """Solve a single SCP sub-problem for the cart-pole swing-up problem."""
     A, B, c = linearize(fd, s_bar[:-1], u_bar)
     A, B, c = np.array(A), np.array(B), np.array(c)
@@ -129,17 +129,15 @@ def scp_iteration(y_state, rho, xbar, u_lagrange, fd: callable, P: np.ndarray, Q
     s_cvx = cp.Variable((N + 1, n))
     u_cvx = cp.Variable((N, m))
     
-    objective = objective(s_cvx, u_cvx, s_goal, N, Q, R, P)
     constraints = []
     constraints +=[s_cvx[0,:] == s_bar[0]]
     
-    objective += (rho/2)*cp.sum_squares(y_state.flatten() - xbar + u)
     for k in range(N-1):
         objective += cp.quad_form(u_cvx[k+1,:]-u_cvx[k,:], np.eye(m))
     
     for k in range(N):
         
-        # objective += cp.quad_form(s_cvx[k,:] - s_goal, Q) + cp.quad_form(u_cvx[k,:], R) 
+        objective += cp.quad_form(s_cvx[k,:] - s_goal, Q) + cp.quad_form(u_cvx[k,:], R) 
         constraints += [s_cvx[k+1,:] == A[k]@s_cvx[k,:] + B[k]@u_cvx[k,:] ]
 
         #Adding constraints for each quadrotor:
@@ -147,15 +145,11 @@ def scp_iteration(y_state, rho, xbar, u_lagrange, fd: callable, P: np.ndarray, Q
 
             for i in range(n_drones):
                 """Convex trust region"""
-                # constraints += [cp.pnorm(s_cvx[k,i*6:(i+1)*6]-s_bar[k,i*6:(i+1)*6],'inf') <= ρ]
-                # constraints += [cp.pnorm(u_cvx[k,i*3:(i+1)*3]-u_bar[k,i*3:(i+1)*3],'inf') <= ρ] 
+                constraints += [cp.pnorm(s_cvx[k,i*6:(i+1)*6]-s_bar[k,i*6:(i+1)*6],'inf') <= ρ]
+                constraints += [cp.pnorm(u_cvx[k,i*3:(i+1)*3]-u_bar[k,i*3:(i+1)*3],'inf') <= ρ] 
                 
                 constraints += [np.array([-np.pi/6, -np.pi/6, -3]) <= u_cvx[k, i*3:(i+1)*3], \
                             u_cvx[k, i*3:(i+1)*3] <= np.array([np.pi/6, np.pi/6, 3])]
-                
-                # #state constraints:
-                # constraints+= [np.array([-5., -5. , 0.9, -np.pi/3, -np.pi/3, -np.pi/3, -5., -5., -5., -1.5, -1.5, -1.5]) <= s_cvx[k, i*12:(i+1)*12],\
-                #             s_cvx[k, i*12:(i+1)*12] <= np.array([5. , 5. , 4., np.pi/3, np.pi/3, np.pi/3, 5., 5., 5., 1.5, 1.5, 1.5])]
             
                 #linearized collision avoidance constraints
                 if iterate > 0:
@@ -165,7 +159,7 @@ def scp_iteration(y_state, rho, xbar, u_lagrange, fd: callable, P: np.ndarray, Q
                         if j != i:
                             constraints+= [cp.norm(prev_pos[i][0:3]-prev_pos[j][0:3], 1) + \
                                         (prev_pos[i][0:3].T-prev_pos[j][0:3].T)/cp.norm(prev_pos[i][0:3]-prev_pos[j][0:3], 1)
-                                            @ (curr_pos[i][0:3]-curr_pos[j][0:3]) >= collision_radius]
+                                        @ (curr_pos[i][0:3]-curr_pos[j][0:3]) >= collision_radius]
                             
         else: #in case we want to test our code with a single drone
    
@@ -176,7 +170,7 @@ def scp_iteration(y_state, rho, xbar, u_lagrange, fd: callable, P: np.ndarray, Q
             constraints += [cp.pnorm(u_cvx[k,:]-u_bar[k,:],'inf') <= ρ] 
 
 
-    # objective += cp.quad_form(s_cvx[-1,:] - s_goal, P)
+    objective += cp.quad_form(s_cvx[-1,:] - s_goal, P)
     print(f'total number of constraints is {len(constraints)}')
     prob = cp.Problem(cp.Minimize(objective), constraints)
     prob.solve(verbose = False)  
