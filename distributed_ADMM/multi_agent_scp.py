@@ -138,7 +138,7 @@ def scp_iteration(fd: callable, P: np.ndarray, Q: np.ndarray, R: np.ndarray,
     for k in range(N):
         
         objective += cp.quad_form(s_cvx[k,:] - s_goal, Q) + cp.quad_form(u_cvx[k,:], R) 
-        constraints += [s_cvx[k+1,:] == A[k]@s_cvx[k,:] + B[k]@u_cvx[k,:] ]
+        constraints += [s_cvx[k+1,:] == A[k]@s_cvx[k,:] + B[k]@u_cvx[k,:] + c[k] ]
 
         #Adding constraints for each quadrotor:
         if n_drones > 1:
