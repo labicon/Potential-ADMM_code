@@ -5,6 +5,8 @@ import casadi as cs
 import dpilqr
 import cvxpy as cp
 from time import perf_counter
+import sys
+
 
 from solvers.util import (
     compute_pairwise_distance_nd_Sym,
@@ -20,6 +22,8 @@ import cvxpy as cp
 from dynamics import linear_kinodynamics
 
 
+"""Centralized Potential-ADMM"""
+
 def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
     """Define constants"""
 
@@ -28,7 +32,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
     N = n_agents
     Ad, Bd = linear_kinodynamics(0.1, N)
 
-    """Creating empty dicts to hold Casadi variables"""
+    """Creating empty dicts to hold Casadi variables for each worker machine"""
     f_list = {}
     d = {} 
     states = {}
@@ -135,7 +139,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
         procs += [Process(target=run_worker, args=(i, f_list[f"cost_{i}"], remote))]
         procs[-1].start()
 
-    MAX_ITER = 5
+    MAX_ITER = 2
     solution_list = []
     iter = 0
     for i in range(MAX_ITER):
@@ -199,10 +203,81 @@ def solve_rhc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
             break
         
     
-    return X_full, U_full, objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf), np.mean(ADMM_iters), np.mean(solve_times)
+    return X_full, U_full, \
+            objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf), \
+            np.mean(ADMM_iters), np.mean(solve_times)
         
         
         
+def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
+    x_curr = x0
+    n_dims = [3]*n_agents
+    u_ref = np.array([0, 0, 0]*n_agents)
+    x_dims = [n_states]*n_agents
+    u_dims = [n_inputs]*n_agents
+    
+    nx = n_states*n_agents
+    nu = n_inputs*n_agents
+    X_full = np.zeros((0, nx))
+    U_full = np.zeros((0, nu))
+    
+    distributed_mpc_iters =0
+    solve_times = []
+    
+    while not np.all(np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), \
+                                                    n_agents, n_states, 3) <= 0.1)):
+        # rel_dists = util.compute_pairwise_distance_nd_Sym(x0,x_dims,n_dims)
+        graph = util.define_inter_graph_threshold(x0, radius, x_dims, ids, n_dims)
+        
+        split_states_initial = split_graph(x0.T, x_dims, graph)
+        split_states_final = split_graph(xr.T, x_dims, graph)
+        split_inputs_ref = split_graph(u_ref.reshape(-1, 1).T, u_dims, graph)
+        
+        X_dec = np.zeros((nx, 1))
+        U_dec = np.zeros((nu, 1))
+        
+        t0 = perf_counter()
+        for (x0_i, xf_i, u_ref_i , (prob, ids_) , place_holder) in zip(split_states_initial, 
+                                       split_states_final,
+                                       split_inputs_ref,
+                                       graph.items(),
+                                       range(len(graph))):
+            
+            x_trj_converged_i, u_trj_converged_i, _ = solve_iteration(n_states, n_inputs, \
+                                                                      x0_i.size//n_states,\
+                                                                      x0_i.reshape(-1,1), \
+                                                                      xf_i.reshape(-1,1), \
+                                                                      T, radius, Q, R, Qf)
+            
+            i_prob = ids_.index(prob)
+            
+            #Collecting solutions from different potential game sub-problems at current time step K:
+            X_dec[place_holder * n_states : (place_holder + 1) * n_states, :] = x_trj_converged_i[
+                1,place_holder * n_states : (place_holder + 1) * n_states
+                ]
+            
+            U_dec[place_holder * n_inputs : (place_holder + 1) * n_inputs, :] = u_trj_converged_i[
+                0, i_prob * n_inputs : (i_prob + 1) * n_inputs
+                ]
+            
+        solve_times.append(perf_counter() - t0)
+        
+        x_curr = X_dec
+        
+        X_full = np.r_[X_full, X_dec.reshape(1,-1)]
+        U_full = np.r_[U_full, U_dec.reshape(1,-1)]
+        
+        distributed_mpc_iters += 1
+        
+        if distributed_mpc_iters > 35:
+            print(f'Max iters reached; exiting MPC loops')
+            break
+        
+    
+    return X_full, U_full, objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf), np.mean(solve_times)
+        
+        
+    
 if __name__ == "__main__":
     
     n_states = 6
@@ -216,7 +291,12 @@ if __name__ == "__main__":
     Qf = Q*500
     R = 0.1*np.eye(n_agents*n_inputs)
     
-    X_full, U_full, obj, mean_iters, avg_SolveTime = solve_rhc(n_states,
+    ids = [100 + n for n in range(n_agents)] #Assigning random IDs for agents
+    
+    centralized = False
+    
+    if centralized:
+        X_full, U_full, obj, mean_iters, avg_SolveTime = solve_rhc(n_states,
                                                 n_inputs,
                                                 n_agents,
                                                 x0,
@@ -226,6 +306,20 @@ if __name__ == "__main__":
                                                 Q,
                                                 R,
                                                 Qf)
+    else:
+        
+        X_full, U_full, obj, mean_iters, avg_SolveTime = solve_distributed_rhc(ids,
+                                                            n_states, 
+                                                            n_inputs, 
+                                                            n_agents, 
+                                                            x0, 
+                                                            xr, 
+                                                            T, 
+                                                            radius,
+                                                            Q, 
+                                                            R, 
+                                                            Qf)
+        
     
     print(f'The average solve time is {avg_SolveTime} seconds!')
     
@@ -233,9 +327,20 @@ if __name__ == "__main__":
     plt.figure(dpi=150)
     dpilqr.plot_solve(X_full, float(obj), xr, x_dims, True, 3)
     plt.gca().set_zticks([0.8,1.2], minor=False)
-    plt.savefig('ADMM_mpc.png')
+    
+    if centralized:
+        plt.savefig('ADMM_mpc(centralized).png')
+    
+    else:
+        plt.savefig('ADMM_mpc(dcentralized).png')
     
     #Plot pairwise distance
     plt.figure(dpi=150)
     dpilqr.plot_pairwise_distances(X_full, x_dims, [3,3,3], radius)
-    plt.savefig('Pairwise_distances_ADMM.png')
+    
+    if centralized:
+        plt.savefig('Pairwise_distances_ADMM(centralized).png')
+        
+    else:
+        plt.savefig('Pairwise_distances_ADMM(decentralized).png')
+        
