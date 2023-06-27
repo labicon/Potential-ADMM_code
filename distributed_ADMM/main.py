@@ -97,8 +97,8 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
                         distances = util.compute_pairwise_distance_nd_Sym(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx], x_dims, n_dims)
                         #Collision avoidance cost
                         for dist in distances:
-                            coll_cost += fmin(0,(dist - 2*radius))**2 * 500
-                            # coll_cost += fmin(0,(dist - radius))**2 * 1000
+                            # coll_cost += fmin(0,(dist - radius))**2 * 500
+                            coll_cost += fmin(0,(dist - 2*radius))**2 * 1000
 
                     #Trajectory smoothing term
                     for ind in range(nx):
@@ -107,23 +107,24 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
                     
                 
                 d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][0:nx] == x0) 
-                        
-                d[f"opti_{agent_id}"].minimize(cost + coll_cost/n_agents + smooth_trj_cost)
+                
+                cost_tot = cost + coll_cost/n_agents + smooth_trj_cost
+                d[f"opti_{agent_id}"].minimize(cost_tot)
                 
                 d[f"opti_{agent_id}"].solver("ipopt")
                 
-                if iter > 0:
-                    d[f"opti_{agent_id}"].set_initial(sol_prev.value_variables())
+                # if iter > 0:
+                    # d[f"opti_{agent_id}"].set_initial(sol_prev.value_variables())
                 
                 sol = d[f"opti_{agent_id}"].solve()
                 # result[f"solution_{0}".format(agent_id)] = sol
-                
+
                 # print(f'paramete xbar has value {sol.value(xbar)}')
                 # print(f'parameter u has value {sol.value(u)}')
                 
-                sol_prev = sol
+                # sol_prev = sol
                 pipe.send(sol.value(states[f"Y_{agent_id}"]))
-            
+                
                 
                 d[f"opti_{agent_id}"].set_value(xbar, pipe.recv()) #receive the averaged result from the main process.
                 d[f"opti_{agent_id}"].set_value(u, sol.value( u + states[f"Y_{agent_id}"] - xbar))
@@ -147,7 +148,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
         procs += [Process(target=run_worker, args=(i, f_list[f"cost_{i}"], remote))]
         procs[-1].start()
 
-    MAX_ITER = 1
+    MAX_ITER = 10
     solution_list = []
     iter = 0
     for i in range(MAX_ITER):
@@ -234,7 +235,7 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
     distributed_mpc_iters =0
     solve_times = []
     x_curr = x0
-    obj_history = [np.inf]
+    # obj_history = [np.inf]
     
     
     while not np.all(np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), \
@@ -314,8 +315,8 @@ if __name__ == "__main__":
     n_agents = 3
     x_dims = [n_states]*n_agents
     x0, xr = util.paper_setup_3_quads()
-    T = 10
-    radius = 0.35
+    T = 8
+    radius = 0.5
     Q = np.diag([5., 5., 5., 1., 1., 1.]*n_agents)
     Qf = Q*500
     R = 0.1*np.eye(n_agents*n_inputs)
@@ -355,7 +356,8 @@ if __name__ == "__main__":
     #Plot trajectory
     plt.figure(dpi=150)
     dpilqr.plot_solve(X_full, float(obj), xr, x_dims, True, 3)
-    plt.gca().set_zticks([0.8,1.2], minor=False)
+    # plt.gca().set_zticks([0.8,1.2], minor=False)
+    plt.legend(plt.gca().get_children()[1:3], ["Start Position", "Goal Position"])
     
     if centralized:
         plt.savefig('ADMM_mpc(centralized).png')
