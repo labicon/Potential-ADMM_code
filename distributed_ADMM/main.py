@@ -98,8 +98,8 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
                         #Collision avoidance cost
                         for dist in distances:
                             # coll_cost += fmin(0,(dist - radius))**2 * 500
-                            coll_cost += fmin(0,(dist - 2*radius))**2 * 1000
-
+                            # coll_cost += fmin(0,(dist - 2*radius))**2 * 1000 #Works, but distnace falls below threshold
+                            coll_cost += fmin(0,(dist - 2*radius))**2 * 1200
                     #Trajectory smoothing term
                     for ind in range(nx):
                         smooth_trj_cost += (states[f"Y_{agent_id}"][:(T+1)*nx][(k+1)*nx:(k+2)*nx][ind]-\
