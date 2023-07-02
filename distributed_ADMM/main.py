@@ -24,21 +24,18 @@ from solvers.util import (
 
 from solvers import util
 from multiprocessing import Process, Pipe
-import cvxpy as cp
 from dynamics import linear_kinodynamics
 
-
-"""Centralized Potential-ADMM"""
-
-def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
+def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MAX_ITER = 5):
     """Define constants"""
-
+    #T is the horizon
     nx = n_states*n_agents
     nu = n_inputs*n_agents
     N = n_agents
     Ad, Bd = linear_kinodynamics(0.1, N)
     x_dims = [n_states] * N
-    n_dims = [3, 3, 3]
+    # n_dims = [3, 3, 3]
+    n_dims = [3]*N
     
     """Creating empty dicts to hold Casadi variables for each worker machine"""
     f_list = {}
@@ -103,42 +100,44 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
                         distances = util.compute_pairwise_distance_nd_Sym(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx], x_dims, n_dims)
                         #Collision avoidance cost
                         for dist in distances:
-                            # coll_cost += fmin(0,(dist - radius))**2 * 500
-                            # coll_cost += fmin(0,(dist - 2*radius))**2 * 1000 #Works, but distnace falls below threshold
-                            coll_cost += fmin(0,(dist - 2*radius))**2 * 1200
+                            # coll_cost += fmin(0,(dist - 2*radius))**2 * 1500 #Works for centralized ADMM MPC
+                            # coll_cost += fmin(0,(dist - 2*radius))**2 * 1200
+                            coll_cost += fmin(0,(dist - 2*radius))**2 * 500
+                          
                     #Trajectory smoothing term
                     for ind in range(nx):
                         smooth_trj_cost += (states[f"Y_{agent_id}"][:(T+1)*nx][(k+1)*nx:(k+2)*nx][ind]-\
                                             states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx][ind])**2
                     
-                
-                d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][0:nx] == x0) 
+                X0 = d[f"opti_{agent_id}"].parameter(x0.shape[0],1)
+                # d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][0:nx] == x0) 
+                d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][0:nx] == X0)
+                d[f"opti_{agent_id}"].set_value(X0,x0)
                 
                 cost_tot = cost + coll_cost/n_agents + smooth_trj_cost
                 d[f"opti_{agent_id}"].minimize(cost_tot)
                 
                 d[f"opti_{agent_id}"].solver("ipopt")
                 
-                # if iter > 0:
-                    # d[f"opti_{agent_id}"].set_initial(sol_prev.value_variables())
+                if iter > 0:
+                    d[f"opti_{agent_id}"].set_initial(sol_prev.value_variables())
                 
                 sol = d[f"opti_{agent_id}"].solve()
                 # print(f'paramete xbar has value {sol.value(xbar)}')
                 # print(f'parameter u has value {sol.value(u)}')
                 
-                # sol_prev = sol
+                sol_prev = sol
                 pipe.send(sol.value(states[f"Y_{agent_id}"]))
                 
                 
                 d[f"opti_{agent_id}"].set_value(xbar, pipe.recv()) #receive the averaged result from the main process.
                 d[f"opti_{agent_id}"].set_value(u, sol.value( u + states[f"Y_{agent_id}"] - xbar))
 
-                iter += 1
-                print(f'Current iteration is {iter}')
+                # print(f'Current iteration is {iter}')
                 
                 d[f"opti_{agent_id}"].subject_to()
                 
-                d[f"opti_{agent_id}"].set_initial(sol.value_variables()) #Warm start the next re-optimization
+                iter += 1                
                 
             except EOFError:
                 print("Connection closed.")
@@ -152,12 +151,15 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
         procs += [Process(target=run_worker, args=(i, f_list[f"cost_{i}"], remote))]
         procs[-1].start()
 
-    MAX_ITER = 5
+    # MAX_ITER = 5
+    # MAX_ITER = 1
     solution_list = []
-    iter = 0
+  
+    
+    admm_iter_time = []
     for i in range(MAX_ITER):
         # Gather and average xi
-
+        t0 = perf_counter()
         xbar = sum(pipe.recv() for pipe in pipes)/N
         # print(f'xbar is {xbar}, has shape {xbar.shape}\n')
 
@@ -167,8 +169,8 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
         # Scatter xbar
         for pipe in pipes:
             pipe.send(xbar)
-            
-        iter += 1
+        
+        admm_iter_time.append(perf_counter() - t0)
 
     [p.terminate() for p in procs]
         
@@ -177,10 +179,10 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf):
     u_trj_converged = solution_list[-1][(T+1)*nx:].reshape((T,nu))
         
     
-    return x_trj_converged, u_trj_converged, iter
+    return x_trj_converged, u_trj_converged, np.mean(admm_iter_time)
 
 
-def solve_rhc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, n_trial=None):
+def solve_rhc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MAX_ITER, n_trial=None):
     centralized = True
     nx = n_states*n_agents
     nu = n_inputs*n_agents
@@ -197,12 +199,12 @@ def solve_rhc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, n_trial
     solve_times = []
     t = 0
     dt = 0.1
+    
     while not np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
-        t0 = perf_counter()
-        x_trj_converged, u_trj_converged, iter = solve_iteration(n_states, n_inputs, n_agents, x_curr, \
-                                                                 xr, T, radius, Q, R, Qf)
-        solve_times.append(perf_counter()-t0)
-        ADMM_iters.append(iter)
+        
+        x_trj_converged, u_trj_converged, avg_iter_time = solve_iteration(n_states, n_inputs, n_agents, x_curr, \
+                                                                 xr, T, radius, Q, R, Qf, MAX_ITER)
+        solve_times.append(avg_iter_time)
         obj_history.append(float(objective(x_trj_converged.T, u_trj_converged.T, u_ref, xr, Q, R, Qf)))
         
         x_curr = x_trj_converged[1]
@@ -213,7 +215,7 @@ def solve_rhc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, n_trial
         
         mpc_iter += 1
         t += dt
-        if mpc_iter > 50:
+        if mpc_iter > 30:
             print('Exiting MPC loops')
             converged = False
             break
@@ -222,23 +224,23 @@ def solve_rhc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, n_trial
     
     if np.all(dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
         converged = True
+
     
     obj_trj = float(objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf))
     
     logging.info(
     f'{n_trial},'
     f'{n_agents},{t},{converged},'
-    f'{obj_trj},{T},{dt},{radius},{centralized},{np.mean(solve_times)},{distance_to_goal(X_full[-1].flatten(), xr, n_agents, n_states)},'
-        )
+    f'{obj_trj},{T},{dt},{radius},{centralized},{np.mean(solve_times)},'
+    f'{dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3)},'
+    )
     
     
-    return X_full, U_full, \
-            objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf), \
-            np.mean(ADMM_iters), np.mean(solve_times)
+    return X_full, U_full, obj_trj, np.mean(solve_times)
         
         
         
-def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, n_trial=None):
+def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MAX_ITER, n_trial=None):
     
     n_dims = [3]*n_agents
     u_ref = np.array([0, 0, 0]*n_agents)
@@ -252,12 +254,12 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
     X_full = np.r_[X_full, x0.reshape(1,-1)]
     
     distributed_mpc_iters =0
-    solve_times = []
+    solve_times_total = []
     x_curr = x0
     # obj_history = [np.inf]
     t = 0
     dt = 0.1
-    converged = False
+
     centralized = False
     while not np.all(np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), \
                                                     n_agents, n_states, 3) <= 0.1)):
@@ -274,23 +276,25 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
         # X_trj = np.zeros((nx, T+1))
         # U_trj = np.zeros((nu, T))
         
-        # t0 = perf_counter()
+        solve_times = []
+ 
         for (x0_i, xf_i, u_ref_i , (prob, ids_) , place_holder) in zip(split_states_initial, 
                                        split_states_final,
                                        split_inputs_ref,
                                        graph.items(),
                                        range(len(graph))):
             print(f'Current sub-problem has {x0_i.size//n_states} agents \n')
+            
             t0 = perf_counter()
-            x_trj_converged_i, u_trj_converged_i, _ = solve_iteration(n_states, n_inputs, \
+            x_trj_converged_i, u_trj_converged_i, iter_time_i = solve_iteration(n_states, n_inputs, \
                                                                       x0_i.size//n_states,\
                                                                       x0_i.reshape(-1,1), \
                                                                       xf_i.reshape(-1,1), \
                                                                       T, radius, 
                                                                       Q[:x0_i.size,:x0_i.size], 
                                                                       R[:u_ref_i.size,:u_ref_i.size], 
-                                                                      Qf[:x0_i.size,:x0_i.size])
-            solve_times.append(perf_counter() - t0)
+                                                                      Qf[:x0_i.size,:x0_i.size], MAX_ITER)
+            solve_times.append(iter_time_i)
             i_prob = ids_.index(prob)
             
             #Collecting solutions from different potential game sub-problems at current time step K:
@@ -309,7 +313,7 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
         #     U_trj[place_holder * n_inputs : (place_holder + 1) * n_inputs, :] = u_trj_converged_i[
         #         :, i_prob * n_inputs : (i_prob + 1) * n_inputs
         #         ].T
-            
+        solve_times_total.append(np.max(solve_times))   #Worst-case run time from each ADMM iteration 
         # obj_history.append(float(objective(X_trj, U_trj, u_ref, xr, Q, R, Qf)))    
         t += dt
         
@@ -320,8 +324,9 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
         
         distributed_mpc_iters += 1
         
-        if distributed_mpc_iters > 50:
+        if distributed_mpc_iters > 30:
             print(f'Max iters reached; exiting MPC loops')
+            converged = False
             break
         
     if np.all(dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
@@ -334,11 +339,117 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
     logging.info(
     f'{n_trial},'
     f'{n_agents},{t},{converged},'
-    f'{obj_trj},{T},{dt},{radius},{centralized},{np.mean(solve_times)},{distance_to_goal(X_full[-1].flatten(), xr, n_agents, n_states)},'
-        )
+    f'{obj_trj},{T},{dt},{radius},{centralized},{np.mean(solve_times_total)},'
+    f'{dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3)},'
+    )
     
-    return X_full, U_full, objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf), np.mean(solve_times)
+    return X_full, U_full, obj_trj, np.mean(solve_times)
+
+def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None):
+    centralized = True
+    Ad,Bd = linear_kinodynamics(0.1, n_agents)
+    nx = n_agents * 6
+    nu = n_agents * 3
+    N = n_agents
+    opti = Opti()
+    Y_state = opti.variable((T+1)*nx + T*nu)
+    cost = 0
+    for t in range(T):
+        for idx in range(nx):
+            cost += (Y_state[:(T+1)*nx][t*nx:(t+1)*nx][idx]-xr[idx]) *  \
+            Q[idx,idx]* (Y_state[:(T+1)*nx][t*nx:(t+1)*nx][idx]-xr[idx]) 
+        for idu in range(nu):
+            cost += (Y_state[(T+1)*nx:][t*nu:(t+1)*nu][idu]) *  \
+            R[idu,idu] * (Y_state[(T+1)*nx:][t*nu:(t+1)*nu][idu])
+
+    for idf in range(nx):
+        cost += (Y_state[:(T+1)*nx][T*nx:(T+1)*nx][idf] - xr[idf]) * \
+        Qf[idf,idf] * (Y_state[:(T+1)*nx][T*nx:(T+1)*nx][idf] - xr[idf])
+
+
+    coll_cost = 0
+    smooth_trj_cost = 0
+    solution_trj = []
+    obj_hist = []
+    x_curr = x0
+
+    X_trj = np.zeros((0, nx))
+    U_trj = np.zeros((0, nu))
+    X_trj = np.r_[X_trj, x0.T]
+    iters = 0
+
+    solve_times = []
+    u_ref = np.array([0, 0, 0]*N)
+    t = 0
+    dt = 0.1
+    while not np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
+
+        for k in range(T):
+            
+            opti.subject_to(Y_state[:(T+1)*nx][(k+1)*nx:(k+2)*nx] \
+                            == Ad @ Y_state[:(T+1)*nx][k*nx:(k+1)*nx] \
+                                + Bd @ Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+
+            opti.subject_to(Y_state[(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([3, 3, 3]),(N,)).reshape(-1,1))
+            opti.subject_to(np.tile(np.array([-3, -3, -3]),(N,)).reshape(-1,1) <= Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+
+            #Pair-wise Euclidean distance between each pair of agents
+            distances = util.compute_pairwise_distance_nd_Sym(Y_state[:(T+1)*nx][k*nx:(k+1)*nx],[6,6,6], [3,3,3])
+            #Collision avoidance cost
+            for dist in distances:
+                coll_cost += fmin(0,(dist - radius))**2 * 1200
+
+            #Smoothing term
+            for ind in range(nx):
+                smooth_trj_cost += (Y_state[:(T+1)*nx][(k+1)*nx:(k+2)*nx][ind]-\
+                                    Y_state[:(T+1)*nx][k*nx:(k+1)*nx][ind])**2
         
+        X0 = opti.parameter(x0.shape[0],1)    
+        # opti.subject_to(Y_state[0:nx] == x_curr) 
+        opti.subject_to(Y_state[0:nx] == X0)
+        
+        cost_tot = cost + coll_cost + smooth_trj_cost
+        opti.minimize(cost_tot)
+
+        opti.solver("ipopt")
+        opti.set_value(X0,x_curr)
+        
+        if iters > 0:
+            opti.set_initial(sol_prev.value_variables())
+            
+        t0 = perf_counter()
+        sol = opti.solve()
+        sol_prev = sol
+        solve_times.append(perf_counter() - t0)
+        obj_hist.append(sol.value(cost_tot))
+        
+        ctrl = sol.value(Y_state)[(T+1)*nx:].reshape((T, nu))[0]
+        # x_curr = Ad@x_curr + (Bd @ ctrl).reshape(-1,1) #Apply first element in the control sequence
+        x_curr = sol.value(Y_state)[:(T+1)*nx].reshape((T+1,nx))[1] #Same as above
+        X_trj = np.r_[X_trj, x_curr.reshape(1,-1)]
+        U_trj = np.r_[U_trj, ctrl.reshape(1,-1)]
+        
+        opti.subject_to()
+        
+        iters += 1
+        t += dt
+        if iters > 30:
+            converged = False
+            break
+    
+    if np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
+        converged = True
+        
+    obj_trj = float(util.objective(X_trj.T, U_trj.T, u_ref, xr, Q, R, Qf)) 
+    logging.info(
+    f'{n_trial},'
+    f'{n_agents},{t},{converged},'
+    f'{obj_trj},{T},{dt},{radius},{centralized},{np.mean(solve_times)},'
+    f'{dpilqr.distance_to_goal(X_trj[-1].flatten(), xr.flatten(), n_agents, n_states, 3)},'
+    )
+        
+    return X_trj, U_trj, obj_trj, np.mean(solve_times)
+    
 
 def setup_logger():
     
@@ -372,43 +483,46 @@ def multi_agent_run(trial, n_states,
     
     if n_agents == 3:
         x0,xr = util.setup_3_quads()
-        n_dims = [3]*3
 
     elif n_agents==4:
         x0, xr=util.setup_4_quads()
-        n_dims=[3]*4
 
     elif n_agents == 5:
         x0,xr = util.setup_5_quads()
-        n_dims = [3]*5
 
     elif n_agents==6:
         x0, xr=util.setup_6_quads()
-        n_dims= [3]*6
 
     elif n_agents==7:
         x0, xr= util.setup_7_quads()
-        n_dims= [3]*7
 
     elif n_agents==8:
         x0, xr= util.setup_8_quads()
-        n_dims= [3]*8
 
     elif n_agents==9:
         x0, xr= util.setup_9_quads()
-        n_dims= [3]*9
 
     elif n_agents == 10:
         x0,xr = util.setup_10_quads()
-        n_dims = [3]*10
+
     
     ids = [100 + i for i in range(n_agents)]
     
     Q = np.diag([5., 5., 5., 1., 1., 1.]*n_agents)
     Qf = Q*500
     R = 0.1*np.eye(n_agents*n_inputs)
-
-    X_full, U_full, obj, mean_iters, avg_SolveTime = solve_rhc(n_states,
+    
+    # X_full, U_full, obj,  avg_SolveTime = solve_mpc_centralized(n_agents, 
+    #                                                             x0,
+    #                                                             xr, 
+    #                                                             T, 
+    #                                                             radius,
+    #                                                             Q,
+    #                                                             R,
+    #                                                             Qf,                                                     
+    #                                                             trial)
+    admm_iter = 1
+    X_full, U_full, obj,  avg_SolveTime = solve_rhc(n_states,
                                                 n_inputs,
                                                 n_agents,
                                                 x0,
@@ -418,6 +532,7 @@ def multi_agent_run(trial, n_states,
                                                 Q,
                                                 R,
                                                 Qf,
+                                                admm_iter,
                                                 trial)
     X_full, U_full, obj, avg_SolveTime = solve_distributed_rhc(ids,
                                                             n_states, 
@@ -430,6 +545,7 @@ def multi_agent_run(trial, n_states,
                                                             Q, 
                                                             R, 
                                                             Qf,
+                                                            admm_iter,
                                                             trial)
 
 
@@ -438,10 +554,10 @@ def monte_carlo_analysis():
 
     setup_logger()
 
-    n_trials_iter = range(30)
+    n_trials_iter = range(40)
 
-    n_agents_iter = [3,4,5,6,7,8,9,10]
-    
+    n_agents_iter = [3, 5, 10]
+    # n_agents_iter = [10]
 
     radius = 0.5
     
@@ -480,9 +596,9 @@ if __name__ == "__main__":
     n_inputs = 3
     n_agents = 3
     x_dims = [n_states]*n_agents
-    x0, xr = util.paper_setup_3_quads()
-    T = 8
-    radius = 0.5
+    # T = 8
+    T = 10
+    radius = 0.35
     Q = np.diag([5., 5., 5., 1., 1., 1.]*n_agents)
     Qf = Q*500
     R = 0.1*np.eye(n_agents*n_inputs)
@@ -490,12 +606,13 @@ if __name__ == "__main__":
     ids = [100 + n for n in range(n_agents)] #Assigning random IDs for agents
     
     centralized = False
-    logging = True
+    Log_Data = False
     
-    if not logging:
-    
+    if not Log_Data:
+        admm_iter = 1
+        x0, xr = util.paper_setup_3_quads()
         if centralized:
-            X_full, U_full, obj, mean_iters, avg_SolveTime = solve_rhc(n_states,
+            X_full, U_full, obj, avg_SolveTime = solve_rhc(n_states,
                                                     n_inputs,
                                                     n_agents,
                                                     x0,
@@ -504,7 +621,8 @@ if __name__ == "__main__":
                                                     radius,
                                                     Q,
                                                     R,
-                                                    Qf)
+                                                    Qf,
+                                                    admm_iter)
         else:
             
             X_full, U_full, obj, avg_SolveTime = solve_distributed_rhc(ids,
@@ -517,7 +635,8 @@ if __name__ == "__main__":
                                                                 radius,
                                                                 Q, 
                                                                 R, 
-                                                                Qf)
+                                                                Qf,
+                                                                admm_iter)
             
         print(f'The average solve time is {avg_SolveTime} seconds!')
     
