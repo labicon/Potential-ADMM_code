@@ -2,7 +2,6 @@ import numpy as np
 import osqp
 import matplotlib.pyplot as plt
 from scipy import sparse
-import control as ct
 from casadi import *
 import casadi as cs
 import dpilqr
