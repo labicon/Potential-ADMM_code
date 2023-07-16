@@ -787,7 +787,6 @@ if __name__ == "__main__":
         plt.savefig('pairwise_distances(vanilla_mpc).png')
         
         
-            
         plt.figure(dpi=150)
         plt.plot(obj_history_admm, 'r', label='Potential Consensus-ADMM')
         plt.plot(obj_history_centralized, 'b', label='Baseline Centralized MPC')
