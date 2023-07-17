@@ -35,6 +35,8 @@ from solvers import util
 from multiprocessing import Process, Pipe
 from dynamics import linear_kinodynamics
 
+opts = {'error_on_fail':False}
+
 def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x_trj_init, state_prev, local_iter, MAX_ITER = 5):
     """Define constants"""
     #T is the horizon
@@ -54,7 +56,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x
     states = {}
     dt = 0.1
     for id in range(N):
-        d["opti_{0}".format(id)] = Opti('conic')
+        d["opti_{0}".format(id)] = Opti()
         
         #Augmented state : Y = (x(0),x(1),...,x(N),u(0),...,u(N-1))
         
@@ -102,61 +104,61 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x
             try:
                 coll_cost = 0
                 smooth_trj_cost = 0
-                # f = util.generate_f(x_dims)
+                f = util.generate_f(x_dims)
                 
                 for k in range(T):
-                    # k1 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx],states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
-                    # k2 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k1, states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
-                    # k3 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k2, states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
-                    # k4 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx]+dt*k3,   states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
-                    # x_next = states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx] + dt/6*(k1+2*k2+2*k3+k4) 
-                    # d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][:(T+1)*nx][(k+1)*nx:(k+2)*nx]==x_next) # close the gaps
+                    k1 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx],states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
+                    k2 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k1, states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
+                    k3 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k2, states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
+                    k4 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx]+dt*k3,   states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
+                    x_next = states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx] + dt/6*(k1+2*k2+2*k3+k4) 
+                    d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][:(T+1)*nx][(k+1)*nx:(k+2)*nx]==x_next) # close the gaps
                     
-                    # d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([np.pi/6, np.pi/6, 20]),(N,)).reshape(-1,1))
-                    # d[f"opti_{agent_id}"].subject_to(np.tile(np.array([-np.pi/6, -np.pi/6, 0]),(N,)).reshape(-1,1) <= states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
+                    d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([np.pi/6, np.pi/6, 20]),(N,)).reshape(-1,1))
+                    d[f"opti_{agent_id}"].subject_to(np.tile(np.array([-np.pi/6, -np.pi/6, 0]),(N,)).reshape(-1,1) <= states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
                     
-                    d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][:(T+1)*nx][(k+1)*nx:(k+2)*nx] \
-                                    == Ad @ states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx] \
-                                        + Bd @ states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
+                    # d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][:(T+1)*nx][(k+1)*nx:(k+2)*nx] \
+                    #                 == Ad @ states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx] \
+                    #                     + Bd @ states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
 
                     d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([3, 3, 3]),(N,)).reshape(-1,1))
                     d[f"opti_{agent_id}"].subject_to(np.tile(np.array([-3, -3, -3]),(N,)).reshape(-1,1) <= states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
+                  
+                
+                    #Soft collision-avoidance constraints
+                    if n_agents > 1:
+                        distances = util.compute_pairwise_distance_nd_Sym(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx], x_dims, n_dims)
+                        #Collision avoidance cost
+                        for dist in distances:
+                            # coll_cost += fmin(0,(dist - 2*radius))**2 * 1500 #Works for centralized ADMM MPC
+                            coll_cost += fmin(0,(dist - 2*radius))**2 * 1200
                     
-                    
-                    # #Soft collision-avoidance constraints
-                    # if n_agents > 1:
-                    #     distances = util.compute_pairwise_distance_nd_Sym(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx], x_dims, n_dims)
-                    #     #Collision avoidance cost
-                    #     for dist in distances:
-                    #         # coll_cost += fmin(0,(dist - 2*radius))**2 * 1500 #Works for centralized ADMM MPC
-                    #         coll_cost += fmin(0,(dist - 2*radius))**2 * 1200
-                    
-                    #Linearized collision constraints:
-                    if N > 1:
-                        if local_iter <= 0:
-                            pos_prev = x_trj_init[k]
-                            print(f'pos_prev has shape {pos_prev.shape}')
-                        
-                        else:
-                            pos_prev = state_prev[:(T+1)*nx].reshape(T+1, nx)[k]
+                    # #Linearized collision constraints:
+                    # if N > 1:
+                    #     if local_iter <= 0:
+                    #         pos_prev = x_trj_init[k]
+                    #         print(f'pos_prev has shape {pos_prev.shape}')
+                    #     else:
+                
+                    #         pos_prev = state_prev[:(T+1)*nx].reshape(T+1, nx)[k]
                             
-                            # pos_prev = X_full[iter-1]
-                            # pos_curr = cp.reshape(y_state[:(T+1)*nx],[T+1,nx])[k]
+                    #         # pos_prev = X_full[iter-1]
+                    #         # pos_curr = cp.reshape(y_state[:(T+1)*nx],[T+1,nx])[k]
                         
-                        for i in range(N):
-                            for j in range(N):
-                                if j != i:
-                                    #See "Generation of collision-free trajectories for a quadrocopter fleet: 
-                                    # A sequential convex programming approach" for the linearization step;
-                                    linearized_dist = cs.norm_2((pos_prev[j*n_states:j*n_states+3]-  \
-                                            pos_prev[i*n_states:i*n_states+3])) + \
-                                            (pos_prev[j*n_states:j*n_states+3].reshape(1,-1)- \
-                                            pos_prev[i*n_states:i*n_states+3].reshape(1,-1))/cs.norm_2((pos_prev[j*n_states:j*n_states+3]\
-                                            -pos_prev[i*n_states:i*n_states+3]))@  \
-                                            (states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx][j*n_states:j*n_states+3] \
-                                            -states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx][i*n_states:i*n_states+3])
-              
-                                    d[f"opti_{agent_id}"].subject_to(linearized_dist >= radius)
+                    #     for i in range(N):
+                    #         for j in range(N):
+                    #             if j != i:
+                    #                 #See "Generation of collision-free trajectories for a quadrocopter fleet: 
+                    #                 # A sequential convex programming approach" for the linearization step;
+                    #                 linearized_dist = cs.norm_2(scaling_matrix@(pos_prev[j*n_states:j*n_states+3]-  \
+                    #                         pos_prev[i*n_states:i*n_states+3])) + \
+                    #                         (pos_prev[j*n_states:j*n_states+3].reshape(1,-1)- \
+                    #                         pos_prev[i*n_states:i*n_states+3].reshape(1,-1))/cs.norm_2(scaling_matrix@(pos_prev[j*n_states:j*n_states+3]\
+                    #                         -pos_prev[i*n_states:i*n_states+3]))@  \
+                    #                         (states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx][j*n_states:j*n_states+3] \
+                    #                         -states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx][i*n_states:i*n_states+3])
+            
+                    #                 d[f"opti_{agent_id}"].subject_to(linearized_dist >= radius)
                     
                     
                     #Trajectory smoothing term
@@ -169,16 +171,17 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x
                 d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][0:nx] == X0)
                 d[f"opti_{agent_id}"].set_value(X0,x0)
                 
-                cost_tot = cost + coll_cost/n_agents + smooth_trj_cost
+                cost_tot = cost + coll_cost + smooth_trj_cost
                 
                 d[f"opti_{agent_id}"].minimize(cost_tot)
-                d[f"opti_{agent_id}"].solver("osqp")
+                # d[f"opti_{agent_id}"].solver("osqp",opts)
+                d[f"opti_{agent_id}"].solver("ipopt")
                 
                 if iter > 0:
                     d[f"opti_{agent_id}"].set_initial(sol_prev.value_variables())
 
                 sol = d[f"opti_{agent_id}"].solve()
-                
+                    
                 # print(f'paramete xbar has value {sol.value(xbar)}')
                 # print(f'parameter u has value {sol.value(u)}')
       
@@ -247,8 +250,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x
         for pair in distances:
             coupling_cost +=  fmin(0,(pair - 2*radius))**2 * 1200
     
-
-    return x_trj_converged, u_trj_converged, admm_iter_time, coupling_cost/N
+    return x_trj_converged, u_trj_converged, admm_iter_time, coupling_cost
 
 
 def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MAX_ITER, n_trial=None):
@@ -269,7 +271,7 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
     t = 0
     dt = 0.1
     # t_kill = T*dt
-    local_iter = 0
+
     state_prev = None
     
     u_init = np.random.rand(3*n_agents)*0.1
@@ -284,9 +286,13 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
         
     while not np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
         
-        x_trj_converged, u_trj_converged, admm_time,coupling_cost = solve_iteration(n_states, n_inputs, n_agents, x_curr, \
-                                                                 xr, T, radius, Q, R, Qf, x_trj_init, state_prev, local_iter, MAX_ITER)
-        local_iter += 1
+        try:
+            x_trj_converged, u_trj_converged, admm_time,coupling_cost = solve_iteration(n_states, n_inputs, n_agents, x_curr, \
+                                                                 xr, T, radius, Q, R, Qf, x_trj_init, state_prev, mpc_iter, MAX_ITER)
+        except RuntimeError:
+            converged = False
+            
+        
         solve_times.append(admm_time)
         state_prev = np.hstack((x_trj_converged.flatten(),u_trj_converged.flatten()))
 
@@ -306,7 +312,7 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
         
         mpc_iter += 1
         t += dt
-        if mpc_iter > 30:
+        if mpc_iter > 35:
             print('Max MPC iters reached!Exiting MPC loops...')
             converged = False
             break
@@ -438,7 +444,7 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
     opti = Opti()
     Y_state = opti.variable((T+1)*nx + T*nu)
     cost = 0
-
+    
     u_ref = np.array([0, 0, 0] * N).reshape(-1,1)
     
     for t in range(T):
@@ -453,10 +459,6 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
         cost += (Y_state[:(T+1)*nx][T*nx:(T+1)*nx][idf] - xr[idf]) * \
         Qf[idf,idf] * (Y_state[:(T+1)*nx][T*nx:(T+1)*nx][idf] - xr[idf])
 
-
-    coll_cost = 0
-    smooth_trj_cost = 0
-    solution_trj = []
     obj_hist = [np.inf]
     x_curr = x0
 
@@ -472,27 +474,44 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
     x_dims = [6]*N
     f = util.generate_f(x_dims)
     Ad,Bd = linear_kinodynamics(0.1,N)
+    
+    u_init = np.random.rand(3*n_agents)*0.1
+    x_trj_init = np.zeros((0, nx))
+    x_trj_init = np.r_[x_trj_init, x0.reshape(1,-1)]
+    Ad,Bd = linear_kinodynamics(0.1,n_agents)
+    x_nominal = x0
+    
+    scaling_matrix = np.diag([1, 1, 2])
+    
+    for _ in range(T):
+        x_nominal = Ad@x_nominal + Bd@u_init.reshape(-1,1)
+        x_trj_init = np.r_[x_trj_init, x_nominal.reshape(1,-1)]
+    
     while not np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
-
+        coll_cost = 0
+        smooth_trj_cost = 0
         for k in range(T):
             
-            # k1 = f(Y_state[:(T+1)*nx][k*nx:(k+1)*nx],         Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
-            # k2 = f(Y_state[:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k1, Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
-            # k3 = f(Y_state[:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k2, Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
-            # k4 = f(Y_state[:(T+1)*nx][k*nx:(k+1)*nx]+dt*k3,   Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
-            # x_next = Y_state[:(T+1)*nx][k*nx:(k+1)*nx] + dt/6*(k1+2*k2+2*k3+k4) 
+            k1 = f(Y_state[:(T+1)*nx][k*nx:(k+1)*nx],         Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+            k2 = f(Y_state[:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k1, Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+            k3 = f(Y_state[:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k2, Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+            k4 = f(Y_state[:(T+1)*nx][k*nx:(k+1)*nx]+dt*k3,   Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+            x_next = Y_state[:(T+1)*nx][k*nx:(k+1)*nx] + dt/6*(k1+2*k2+2*k3+k4) 
 
-            # opti.subject_to(Y_state[:(T+1)*nx][(k+1)*nx:(k+2)*nx]==x_next) # close the gaps
+            opti.subject_to(Y_state[:(T+1)*nx][(k+1)*nx:(k+2)*nx]==x_next) # close the gaps
             
-            # opti.subject_to(Y_state[(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([np.pi/6, np.pi/6, 20]),(N,)).reshape(-1,1))
-            # opti.subject_to(np.tile(np.array([-np.pi/6, -np.pi/6, 0]),(N,)).reshape(-1,1) <= Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+            opti.subject_to(Y_state[(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([np.pi/6, np.pi/6, 20]),(N,)).reshape(-1,1))
+            opti.subject_to(np.tile(np.array([-np.pi/6, -np.pi/6, 0]),(N,)).reshape(-1,1) <= Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
             
-            opti.subject_to(Y_state[:(T+1)*nx][(k+1)*nx:(k+2)*nx] \
-                            == Ad @ Y_state[:(T+1)*nx][k*nx:(k+1)*nx] \
-                                + Bd @ Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+            # opti.subject_to(Y_state[:(T+1)*nx][(k+1)*nx:(k+2)*nx] \
+            #                 == Ad @ Y_state[:(T+1)*nx][k*nx:(k+1)*nx] \
+            #                     + Bd @ Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
             
             opti.subject_to(Y_state[(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([3, 3, 3]),(N,)).reshape(-1,1))
             opti.subject_to(np.tile(np.array([-3, -3, -3]),(N,)).reshape(-1,1) <= Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
+
+            # opti.subject_to(Y_state[:(T+1)*nx][k*nx:(k+1)*nx] <= np.tile(np.array([4, 4, 4, 3, 3, 3]),(N,)).reshape(-1,1))
+            # opti.subject_to(np.tile(np.array([-4, -4, -4, -3, -3, 0]),(N,)).reshape(-1,1) <= Y_state[:(T+1)*nx][k*nx:(k+1)*nx])
 
             #Pair-wise Euclidean distance between each pair of agents
             distances = util.compute_pairwise_distance_nd_Sym(Y_state[:(T+1)*nx][k*nx:(k+1)*nx],[6,6,6], [3,3,3])
@@ -500,6 +519,33 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
             for dist in distances:
                 coll_cost += fmin(0,(dist - radius))**2 * 1200
                 # coll_cost += fmin(0,(dist - radius))**2 * 400
+            
+            # #Linearized collision constraints:
+            # if N > 1:
+            #     if iters <= 0:
+            #         pos_prev = x_trj_init[k]
+            #         print(f'pos_prev has shape {pos_prev.shape}')
+                
+            #     else:
+            #         pos_prev = state_prev[:(T+1)*nx].reshape(T+1, nx)[k]
+                    
+            #         # pos_prev = X_full[iter-1]
+            #         # pos_curr = cp.reshape(y_state[:(T+1)*nx],[T+1,nx])[k]
+                
+            #     for i in range(N):
+            #         for j in range(N):
+            #             if j != i:
+            #                 #See "Generation of collision-free trajectories for a quadrocopter fleet: 
+            #                 # A sequential convex programming approach" for the linearization step;
+            #                 linearized_dist = cs.norm_2(scaling_matrix@(pos_prev[j*n_states:j*n_states+3]-  \
+            #                         pos_prev[i*n_states:i*n_states+3])) + \
+            #                         (pos_prev[j*n_states:j*n_states+3].reshape(1,-1)- \
+            #                         pos_prev[i*n_states:i*n_states+3].reshape(1,-1))/cs.norm_2(scaling_matrix@(pos_prev[j*n_states:j*n_states+3]\
+            #                         -pos_prev[i*n_states:i*n_states+3]))@  \
+            #                         (Y_state[:(T+1)*nx][k*nx:(k+1)*nx][j*n_states:j*n_states+3] \
+            #                         -Y_state[:(T+1)*nx][k*nx:(k+1)*nx][i*n_states:i*n_states+3])
+        
+            #                 opti.subject_to(linearized_dist >= radius)
 
             #Smoothing term
             for ind in range(nx):
@@ -510,8 +556,10 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
         opti.subject_to(Y_state[0:nx] == X0)
         
         cost_tot = cost + coll_cost + smooth_trj_cost
+        
         opti.minimize(cost_tot)
 
+        # opti.solver('osqp',opts)
         opti.solver("ipopt")
         opti.set_value(X0,x_curr)
         
@@ -519,10 +567,18 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
             opti.set_initial(sol_prev.value_variables())
             
         t0 = perf_counter()
-        sol = opti.solve()
+        try:
+            sol = opti.solve()
+            
+        except RuntimeError:
+            converged=False
+            break
+            
         sol_prev = sol
         solve_times.append(perf_counter() - t0)
         obj_hist.append(sol.value(cost_tot))
+        
+        state_prev = sol.value(Y_state)
         
         ctrl = sol.value(Y_state)[(T+1)*nx:].reshape((T, nu))[0]
         x_curr = sol.value(Y_state)[:(T+1)*nx].reshape((T+1,nx))[1] #Same as above
@@ -533,8 +589,9 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
         
         iters += 1
         t += dt
-        if iters > 30:
+        if iters > 35:
             converged = False
+            print(f'Max MPC iters reached; exiting MPC loops.....')
             break
     
     if np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
@@ -611,23 +668,23 @@ def multi_agent_run(trial,
     Q = np.diag([5., 5., 5., 1., 1., 1.]*n_agents)
     Qf = Q*500
     R = 0.1*np.eye(n_agents*n_inputs)
-    
-    admm_iter = 1
-    
-    model = QuadcopterDynamics6D
-    dynamics = MultiDynamicalModel([model(0.1, id_) for id_ in ids])
-    goal_costs = [
-        ReferenceCost(xr_i, Q.copy(), R.copy(), Qf.copy(), id_)
-        for xr_i, id_ in zip(split_agents_gen(xr, x_dims), ids)
-    ]
-    prox_cost = ProximityCost(x_dims, radius, n_dims)
-    game_cost = GameCost(goal_costs, prox_cost)
 
-    problem = ilqrProblem(dynamics, game_cost)
+    admm_iter = 3
     
-    STEP_SIZE=1
-    n_d=3
-    N = T
+    # model = QuadcopterDynamics6D
+    # dynamics = MultiDynamicalModel([model(0.1, id_) for id_ in ids])
+    # goal_costs = [
+    #     ReferenceCost(xr_i, Q.copy(), R.copy(), Qf.copy(), id_)
+    #     for xr_i, id_ in zip(split_agents_gen(xr, x_dims), ids)
+    # ]
+    # prox_cost = ProximityCost(x_dims, radius, n_dims)
+    # game_cost = GameCost(goal_costs, prox_cost)
+
+    # problem = ilqrProblem(dynamics, game_cost)
+    
+    # STEP_SIZE=1
+    # n_d=3
+    # N = T
     # Xd, Ud, Jd = solve_rhc( problem,
     #                         x0,
     #                         N,
@@ -685,10 +742,12 @@ def monte_carlo_analysis():
 
     n_trials_iter = range(30)
 
-    n_agents_iter = [3, 4, 5, 6, 7, 8]
+    # n_agents_iter = [3, 4, 5, 6, 7, 8]
+    n_agents_iter = [3, 5, 10]
     # n_agents_iter = [10]
 
     radius = 0.5
+  
     
     # Change the for loops into multi-processing?
 
@@ -737,7 +796,7 @@ if __name__ == "__main__":
         # admm_iter = 5
         admm_iter = 3
         x0, xr = util.paper_setup_3_quads()
-        # if centralized:
+
         X_full, U_full, obj, avg_SolveTime, obj_history_admm = solve_admm_mpc(n_states,
                                                             n_inputs,
                                                             n_agents,

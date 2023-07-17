@@ -1,2 +1,0 @@
-i_trial, n_agents, t, converged, obj_trj,T,dt,radius,         ADMM ,t_solve_step, MAX_ITER, dist_to_goal
-0,3,1.3,True,274.830358329344,8,0.1,0.5,False,0.3332320561525054, None,[0.033 0.026 0.074],
