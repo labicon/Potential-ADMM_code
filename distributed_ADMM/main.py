@@ -95,17 +95,14 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x
         
         # ADMM loop
         iter = 0
-        #open-loop rollout of dynamics
-        # u_init = np.array([0, 0, 0]*N)
        
-        scaling_matrix = np.diag([1, 1, 2])
-        Ad,Bd = linear_kinodynamics(0.1, N)
+        # scaling_matrix = np.diag([1, 1, 2])
+        # Ad,Bd = linear_kinodynamics(0.1, N)
         while True:
             try:
                 coll_cost = 0
                 smooth_trj_cost = 0
                 f = util.generate_f(x_dims)
-                
                 for k in range(T):
                     k1 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx],states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
                     k2 = f(states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx]+dt/2*k1, states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
@@ -121,8 +118,8 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x
                     #                 == Ad @ states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx] \
                     #                     + Bd @ states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
 
-                    d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([3, 3, 3]),(N,)).reshape(-1,1))
-                    d[f"opti_{agent_id}"].subject_to(np.tile(np.array([-3, -3, -3]),(N,)).reshape(-1,1) <= states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
+                    # d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([3, 3, 3]),(N,)).reshape(-1,1))
+                    # d[f"opti_{agent_id}"].subject_to(np.tile(np.array([-3, -3, -3]),(N,)).reshape(-1,1) <= states[f"Y_{agent_id}"][(T+1)*nx:][k*nu:(k+1)*nu])
                   
                 
                     #Soft collision-avoidance constraints
@@ -167,9 +164,8 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x
                                             states[f"Y_{agent_id}"][:(T+1)*nx][k*nx:(k+1)*nx][ind])**2
                     
                 X0 = d[f"opti_{agent_id}"].parameter(x0.shape[0],1)
-                # d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][0:nx] == x0) 
+ 
                 d[f"opti_{agent_id}"].subject_to(states[f"Y_{agent_id}"][0:nx] == X0)
-                d[f"opti_{agent_id}"].set_value(X0,x0)
                 
                 cost_tot = cost + coll_cost + smooth_trj_cost
                 
@@ -179,15 +175,11 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, x
                 
                 if iter > 0:
                     d[f"opti_{agent_id}"].set_initial(sol_prev.value_variables())
-
+                
+                d[f"opti_{agent_id}"].set_value(X0,x0)
                 sol = d[f"opti_{agent_id}"].solve()
-                    
-                # print(f'paramete xbar has value {sol.value(xbar)}')
-                # print(f'parameter u has value {sol.value(u)}')
       
                 sol_prev = sol
-                
-                # state_prev = sol.value(states[f"Y_{agent_id}"])
                 pipe.send(sol.value(states[f"Y_{agent_id}"]))
                 
                 d[f"opti_{agent_id}"].set_value(xbar, pipe.recv()) #receive the averaged result from the main process.
@@ -312,7 +304,7 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
         
         mpc_iter += 1
         t += dt
-        if mpc_iter > 35:
+        if mpc_iter > 30:
             print('Max MPC iters reached!Exiting MPC loops...')
             converged = False
             break
@@ -472,6 +464,7 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
     dt = 0.1
     
     x_dims = [6]*N
+    n_dims = [3]*N
     f = util.generate_f(x_dims)
     Ad,Bd = linear_kinodynamics(0.1,N)
     
@@ -507,17 +500,14 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
             #                 == Ad @ Y_state[:(T+1)*nx][k*nx:(k+1)*nx] \
             #                     + Bd @ Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
             
-            opti.subject_to(Y_state[(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([3, 3, 3]),(N,)).reshape(-1,1))
-            opti.subject_to(np.tile(np.array([-3, -3, -3]),(N,)).reshape(-1,1) <= Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
-
-            # opti.subject_to(Y_state[:(T+1)*nx][k*nx:(k+1)*nx] <= np.tile(np.array([4, 4, 4, 3, 3, 3]),(N,)).reshape(-1,1))
-            # opti.subject_to(np.tile(np.array([-4, -4, -4, -3, -3, 0]),(N,)).reshape(-1,1) <= Y_state[:(T+1)*nx][k*nx:(k+1)*nx])
+            # opti.subject_to(Y_state[(T+1)*nx:][k*nu:(k+1)*nu] <= np.tile(np.array([3, 3, 3]),(N,)).reshape(-1,1))
+            # opti.subject_to(np.tile(np.array([-3, -3, -3]),(N,)).reshape(-1,1) <= Y_state[(T+1)*nx:][k*nu:(k+1)*nu])
 
             #Pair-wise Euclidean distance between each pair of agents
-            distances = util.compute_pairwise_distance_nd_Sym(Y_state[:(T+1)*nx][k*nx:(k+1)*nx],[6,6,6], [3,3,3])
+            distances = util.compute_pairwise_distance_nd_Sym(Y_state[:(T+1)*nx][k*nx:(k+1)*nx],x_dims, n_dims)
             #Collision avoidance cost
             for dist in distances:
-                coll_cost += fmin(0,(dist - radius))**2 * 1200
+                coll_cost += fmin(0,(dist - 2*radius))**2 * 1200
                 # coll_cost += fmin(0,(dist - radius))**2 * 400
             
             # #Linearized collision constraints:
@@ -589,7 +579,7 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, n_trial = None)
         
         iters += 1
         t += dt
-        if iters > 35:
+        if iters > 30:
             converged = False
             print(f'Max MPC iters reached; exiting MPC loops.....')
             break
@@ -742,8 +732,8 @@ def monte_carlo_analysis():
 
     n_trials_iter = range(30)
 
-    # n_agents_iter = [3, 4, 5, 6, 7, 8]
-    n_agents_iter = [3, 5, 10]
+    n_agents_iter = [3, 4, 5, 6, 7, 8]
+    # n_agents_iter = [3, 5, 10]
     # n_agents_iter = [10]
 
     radius = 0.5
@@ -794,7 +784,7 @@ if __name__ == "__main__":
     if not Log_Data:
         # admm_iter = 15
         # admm_iter = 5
-        admm_iter = 3
+        admm_iter = 5
         x0, xr = util.paper_setup_3_quads()
 
         X_full, U_full, obj, avg_SolveTime, obj_history_admm = solve_admm_mpc(n_states,
