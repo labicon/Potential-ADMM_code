@@ -198,7 +198,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, M
     u_trj_converged = solution_list[-1][(T+1)*nx:].reshape((T,nu))
     
     coupling_cost = 0
-    for k in range(x_trj_converged.shape[0]-1):
+    for k in range(x_trj_converged.shape[0]):
         distances = util.compute_pairwise_distance_nd_Sym(x_trj_converged[k,:].reshape(-1,1), x_dims, n_dims)
         for pair in distances:
             coupling_cost +=  fmin(0,(pair - 2*radius))**2 * 1200
@@ -210,7 +210,8 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
     SOVA_admm = False
     nx = n_states*n_agents
     nu = n_inputs*n_agents
-    
+    n_dims = [3]*n_agents
+    x_dims = [n_states]*n_agents
     X_full = np.zeros((0, nx))
     U_full = np.zeros((0, nu))
     X_full = np.r_[X_full, x0.reshape(1,-1)]
@@ -280,8 +281,13 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
     if np.all(dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3) <= 0.1):
         converged = True
 
+    coll_cost = 0
+    for k in range(X_full.shape[0]):
+        distances = util.compute_pairwise_distance_nd_Sym(X_full[k,:].reshape(-1,1), x_dims, n_dims)
+        for pair in distances:
+            coll_cost +=  fmin(0,(pair - 2*radius))**2 * 1200
     
-    obj_trj = float(objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf))
+    obj_trj = float(objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf) + coll_cost)
     
     logging.info(
     f'{n_trial},'
@@ -418,7 +424,14 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
         
     print(f'Final distance to goal is {dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3)}')    
     
-    obj_trj = float(objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf))
+    
+    coll_cost = 0
+    for k in range(X_full.shape[0]):
+        distances = util.compute_pairwise_distance_nd_Sym(X_full[k,:].reshape(-1,1), x_dims, n_dims)
+        for pair in distances:
+            coll_cost +=  fmin(0,(pair - 2*radius))**2 * 1200
+    
+    obj_trj = float(objective(X_full.T, U_full.T, u_ref, xr, Q, R, Qf) + coll_cost)
     
 
     logging.info(
@@ -659,12 +672,11 @@ def monte_carlo_analysis():
     setup_logger()
 
     # n_trials_iter = range(30)
-    # n_trials_iter = range(50)
-    n_trials_iter = range(16,50)
+    n_trials_iter = range(50)
+
 
     # n_agents_iter = [3, 4, 5, 6, 7, 8]
-    # n_agents_iter = [3, 5, 8]
-    n_agents_iter = [7]
+    n_agents_iter = [3, 5, 7]
 
     radius = 0.5
   
@@ -734,7 +746,7 @@ if __name__ == "__main__":
         dpilqr.plot_solve(X_full, float(obj), xr, x_dims, True, 3)
         # plt.gca().set_zticks([0.8,1.2], minor=False)
         plt.legend(plt.gca().get_children()[1:3], ["Start Position", "Goal Position"])
-        plt.savefig('ADMM_mpc.png')
+        plt.savefig('regular_ADMM_mpc.png')
         
         
         plt.figure(dpi=150)
