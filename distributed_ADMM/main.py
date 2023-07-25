@@ -722,14 +722,14 @@ if __name__ == "__main__":
     
     ids = [100 + n for n in range(n_agents)] #Assigning random IDs for agents
     
-    Log_Data = True
+    Log_Data = False
     if not Log_Data:
         # admm_iter = 15
         # admm_iter = 5
         admm_iter = 5
         x0, xr = util.paper_setup_3_quads(True)
 
-        X_full, U_full, obj, avg_SolveTime, obj_history_admm = solve_admm_mpc(n_states,
+        X_full, U_full, obj_centralized, avg_SolveTime, obj_history_admm = solve_admm_mpc(n_states,
                                                             n_inputs,
                                                             n_agents,
                                                             x0,
@@ -743,7 +743,7 @@ if __name__ == "__main__":
         print(f'The average solve time is {avg_SolveTime} seconds!')
         #Plot trajectory
         plt.figure(dpi=150)
-        dpilqr.plot_solve(X_full, float(obj), xr, x_dims, True, 3)
+        dpilqr.plot_solve(X_full, float(obj_centralized), xr, x_dims, True, 3)
         # plt.gca().set_zticks([0.8,1.2], minor=False)
         plt.legend(plt.gca().get_children()[1:3], ["Start Position", "Goal Position"])
         plt.savefig('regular_ADMM_mpc.png')
@@ -754,7 +754,7 @@ if __name__ == "__main__":
         plt.title('Pairwise-distances from C-ADMM')
         plt.savefig('pairwise_distances(ADMM).png')
         
-        X_full, U_full, obj,  avg_SolveTime, obj_history_sova = solve_distributed_rhc(ids, 
+        X_full, U_full, obj_sova,  avg_SolveTime, obj_history_sova = solve_distributed_rhc(ids, 
                                                                    n_states, 
                                                                    n_inputs, 
                                                                    n_agents, 
@@ -769,7 +769,7 @@ if __name__ == "__main__":
         print(f'The average solve time is {avg_SolveTime} seconds!')
         
         plt.figure(dpi=150)
-        dpilqr.plot_solve(X_full, float(obj), xr, x_dims, True, 3)
+        dpilqr.plot_solve(X_full, float(obj_sova), xr, x_dims, True, 3)
         # plt.gca().set_zticks([0.8,1.2], minor=False)
         plt.legend(plt.gca().get_children()[1:3], ["Start Position", "Goal Position"])
         plt.savefig('SOVA_ADMM_mpc.png')
@@ -780,13 +780,13 @@ if __name__ == "__main__":
         plt.savefig('pairwise_distances(SOVA_mpc).png')
         
         
-        plt.figure(dpi=150)
-        plt.plot(obj_history_admm, 'r', label='Consensus-ADMM')
-        plt.plot(obj_history_sova, 'b', label='SOVA-ADMM MPC')
-        plt.ylabel('Total Cost-to-go')
-        plt.xlabel('Horizon')
-        plt.legend(loc='best')
-        plt.savefig('convergence_rate.png')
+        # plt.figure(dpi=150)
+        # plt.plot(np.linalg.norm(obj_centralized - obj_history_admm), 'r', label='Consensus-ADMM')
+        # plt.plot(np.linalg.norm(obj_sova - obj_history_sova), 'b', label='Potential-ADMM')
+        # plt.ylabel('Total Cost-to-go')
+        # plt.xlabel('Horizon')
+        # plt.legend(loc='best')
+        # plt.savefig('convergence_rate.png')
         
 
     if Log_Data:
