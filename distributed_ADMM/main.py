@@ -248,7 +248,7 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
             return X_full, U_full, obj_trj, np.mean(solve_times), obj_history
             
     
-        if admm_time >= 2*t_kill:
+        if admm_time >= 5*t_kill:
             converged = False
             obj_trj = np.inf
             print('Solve time exceeded t_kill!！ Exiting...')
@@ -672,11 +672,12 @@ def monte_carlo_analysis():
     setup_logger()
 
     # n_trials_iter = range(30)
-    n_trials_iter = range(50)
+    n_trials_iter = range(30)
 
 
-    # n_agents_iter = [3, 4, 5, 6, 7, 8]
-    n_agents_iter = [3, 5, 7]
+    n_agents_iter = [3, 4, 5, 6, 7, 8]
+    # n_agents_iter = [3, 5, 7]
+    # n_agents_iter = [7]
 
     radius = 0.5
   
@@ -727,7 +728,7 @@ if __name__ == "__main__":
         # admm_iter = 15
         # admm_iter = 5
         admm_iter = 5
-        x0, xr = util.paper_setup_3_quads(True)
+        x0, xr = util.paper_setup_3_quads()
 
         X_full, U_full, obj_centralized, avg_SolveTime, obj_history_admm = solve_admm_mpc(n_states,
                                                             n_inputs,
