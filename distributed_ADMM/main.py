@@ -87,10 +87,10 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, M
         
         u = d[f"opti_{agent_id}"].parameter((T+1)*nx + T*nu)
         d[f"opti_{agent_id}"].set_value(u, cs.GenDM_zeros((T+1)*nx + T*nu,1))
-        
-        #This is the scaled Lagrange multiplier
 
-        rho = 1
+        #This is the scaled Lagrange multiplier
+        # rho = 1.0
+        rho = 0.1
         cost += (rho/2)*sumsqr(states[f"Y_{agent_id}"] - xbar + u)
         
         # ADMM loop
@@ -119,7 +119,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, M
                         for dist in distances:
                             # coll_cost += fmin(0,(dist - 2*radius))**2 * 1500 #Works for centralized ADMM MPC
                             coll_cost += fmin(0,(dist - 2*radius))**2 * 1200
-  
+                            
                     #Trajectory smoothing term
                     for ind in range(nx):
                         smooth_trj_cost += (states[f"Y_{agent_id}"][:(T+1)*nx][(k+1)*nx:(k+2)*nx][ind]-\
@@ -145,7 +145,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, M
                 
                 d[f"opti_{agent_id}"].set_value(xbar, pipe.recv()) #receive the averaged result from the main process.
                 d[f"opti_{agent_id}"].set_value(u, sol.value( u + states[f"Y_{agent_id}"] - xbar))
-
+                
                 # print(f'Current iteration is {iter}')
                 
                 d[f"opti_{agent_id}"].subject_to()
@@ -154,7 +154,7 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, M
                 
             except EOFError:
                 print("Connection closed.")
-                # break
+                break
                     
     pipes = []
     procs = []
@@ -185,10 +185,10 @@ def solve_iteration(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, M
         
         iter += 1
         
-        if np.linalg.norm(x_bar_history[iter]-x_bar_history[iter-1]) <= 1e-3:
-            print(f'Consensus reached after {iter} iterations!')
+        # if np.linalg.norm(x_bar_history[iter]-x_bar_history[iter-1]) <= 1e-5:
+        #     print(f'Consensus reached after {iter} iterations!')
             
-            break
+        #     break
 
     admm_iter_time = perf_counter() - admm_iter_t0    
     [p.terminate() for p in procs]
@@ -234,7 +234,7 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
             
             solve_times.append(admm_time)
         except EOFError or RuntimeError:
-            
+            admm_time = np.inf
             solve_times.append(admm_time)
             print('Error encountered in solve_iteration!! Exiting...')
             converged = False
@@ -248,17 +248,17 @@ def solve_admm_mpc(n_states, n_inputs, n_agents, x0, xr, T, radius, Q, R, Qf, MA
             return X_full, U_full, obj_trj, np.mean(solve_times), obj_history
             
     
-        if admm_time >= 5*t_kill:
-            converged = False
-            obj_trj = np.inf
-            print('Solve time exceeded t_kill!！ Exiting...')
-            logging.info(
-            f'{n_trial},'
-            f'{n_agents},{t},{converged},'
-            f'{obj_trj},{T},{dt},{radius},{SOVA_admm},{np.mean(solve_times)},{np.std(solve_times)}, {MAX_ITER},'
-            f'{dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3)},'
-            )
-            return X_full, U_full, obj_trj, np.mean(solve_times), obj_history
+        # if admm_time >= 5*t_kill:
+        #     converged = False
+        #     obj_trj = np.inf
+        #     print('Solve time exceeded t_kill!！ Exiting...')
+        #     logging.info(
+        #     f'{n_trial},'
+        #     f'{n_agents},{t},{converged},'
+        #     f'{obj_trj},{T},{dt},{radius},{SOVA_admm},{np.mean(solve_times)},{np.std(solve_times)}, {MAX_ITER},'
+        #     f'{dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3)},'
+        #     )
+        #     return X_full, U_full, obj_trj, np.mean(solve_times), obj_history
         
         obj_history.append(float(objective(x_trj_converged.T, u_trj_converged.T, u_ref, xr, Q, R, Qf))\
                            +float(coupling_cost))
@@ -323,7 +323,7 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
 
     SOVA_admm = True
     
-    t_kill = n_agents * T * dt
+    t_kill = 5*n_agents * T * dt
     while not np.all(np.all(dpilqr.distance_to_goal(x_curr.flatten(), xr.flatten(), \
                                                     n_agents, n_states, 3) <= 0.1)):
         # rel_dists = util.compute_pairwise_distance_nd_Sym(x0,x_dims,n_dims)
@@ -371,17 +371,17 @@ def solve_distributed_rhc(ids, n_states, n_inputs, n_agents, x0, xr, T, radius, 
                 )
                 return X_full, U_full, obj_trj, np.mean(solve_times_mean), obj_history
                 
-            if iter_time_i >= t_kill:
-                converged = False
-                obj_trj = np.inf
+            # if iter_time_i >= t_kill:
+            #     converged = False
+            #     obj_trj = np.inf
                 
-                logging.info(
-                f'{n_trial},'
-                f'{n_agents},{t},{converged},'
-                f'{obj_trj},{T},{dt},{radius},{SOVA_admm},{np.mean(solve_times_mean)},{np.mean(solve_times_std)},{MAX_ITER},'
-                f'{dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3)},'
-                )
-                return X_full, U_full, obj_trj, np.mean(solve_times_mean), obj_history
+            #     logging.info(
+            #     f'{n_trial},'
+            #     f'{n_agents},{t},{converged},'
+            #     f'{obj_trj},{T},{dt},{radius},{SOVA_admm},{np.mean(solve_times_mean)},{np.mean(solve_times_std)},{MAX_ITER},'
+            #     f'{dpilqr.distance_to_goal(X_full[-1].flatten(), xr.flatten(), n_agents, n_states, 3)},'
+            #     )
+            #     return X_full, U_full, obj_trj, np.mean(solve_times_mean), obj_history
             
             i_prob = ids_.index(prob)
             
@@ -723,12 +723,15 @@ if __name__ == "__main__":
     
     ids = [100 + n for n in range(n_agents)] #Assigning random IDs for agents
     
-    Log_Data = False
+    Log_Data = True
     if not Log_Data:
         # admm_iter = 15
         # admm_iter = 5
         admm_iter = 5
         x0, xr = util.paper_setup_3_quads()
+
+        x_dims = [6]*3
+        n_dims = [3]*3
 
         X_full, U_full, obj_centralized, avg_SolveTime, obj_history_admm = solve_admm_mpc(n_states,
                                                             n_inputs,
@@ -751,7 +754,7 @@ if __name__ == "__main__":
         
         
         plt.figure(dpi=150)
-        dpilqr.plot_pairwise_distances(X_full, [6,6,6], [3,3,3], radius)
+        dpilqr.plot_pairwise_distances(X_full, x_dims, n_dims, radius)
         plt.title('Pairwise-distances from C-ADMM')
         plt.savefig('pairwise_distances(ADMM).png')
         
@@ -776,7 +779,7 @@ if __name__ == "__main__":
         plt.savefig('SOVA_ADMM_mpc.png')
         
         plt.figure(dpi=150)
-        dpilqr.plot_pairwise_distances(X_full, [6,6,6], [3,3,3], radius)
+        dpilqr.plot_pairwise_distances(X_full, x_dims, n_dims, radius)
         plt.title('Pairwise-distances from SOVA-ADMM MPC')
         plt.savefig('pairwise_distances(SOVA_mpc).png')
         
