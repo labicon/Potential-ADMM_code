@@ -624,28 +624,28 @@ def multi_agent_run(trial,
     Qf = Q*500
     R = 0.1*np.eye(n_agents*n_inputs)
 
-    X_full, U_full, obj,  avg_SolveTime, _ = solve_mpc_centralized(n_agents, 
-                                                                x0,
-                                                                xr, 
-                                                                T, 
-                                                                radius,
-                                                                Q,
-                                                                R,
-                                                                Qf,                                                     
-                                                                trial)
+    # X_full, U_full, obj,  avg_SolveTime, _ = solve_mpc_centralized(n_agents, 
+    #                                                             x0,
+    #                                                             xr, 
+    #                                                             T, 
+    #                                                             radius,
+    #                                                             Q,
+    #                                                             R,
+    #                                                             Qf,                                                     
+    #                                                             trial)
     
-    # X_full, U_full, obj,  avg_SolveTime, _ = solve_admm_mpc(n_states,
-    #                                             n_inputs,
-    #                                             n_agents,
-    #                                             x0,
-    #                                             xr,
-    #                                             T,
-    #                                             radius,
-    #                                             Q,
-    #                                             R,
-    #                                             Qf,
-    #                                             admm_iter,
-    #                                             trial)
+    X_full, U_full, obj,  avg_SolveTime, _ = solve_admm_mpc(n_states,
+                                                n_inputs,
+                                                n_agents,
+                                                x0,
+                                                xr,
+                                                T,
+                                                radius,
+                                                Q,
+                                                R,
+                                                Qf,
+                                                admm_iter,
+                                                trial)
     
     X_full, U_full, obj,  avg_SolveTime, _ = solve_distributed_rhc(ids, 
                                                                    n_states, 
@@ -671,7 +671,8 @@ def monte_carlo_analysis():
     n_trials_iter = range(30)
 
 
-    n_agents_iter = [3, 4, 5, 6, 7, 8]
+    n_agents_iter = [3, 4]
+    
     # n_agents_iter = [3, 5, 7]
     # n_agents_iter = [7]
 
@@ -723,7 +724,7 @@ if __name__ == "__main__":
     
     ids = [100 + n for n in range(n_agents)] #Assigning random IDs for agents
     
-    Log_Data = True
+    Log_Data = False
     if not Log_Data:
         # admm_iter = 15
         # admm_iter = 5
