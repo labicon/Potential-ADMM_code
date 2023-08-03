@@ -679,6 +679,7 @@ def monte_carlo_analysis():
     # n_agents_iter = [7]
 
     admm_iters = [1, 3, 5, 10, 15]
+    # admm_iters = [3]
     radius = 0.5
     
     
