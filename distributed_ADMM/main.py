@@ -669,30 +669,24 @@ def monte_carlo_analysis():
 
     setup_logger()
 
-    # n_trials_iter = range(30)
-    n_trials_iter = range(30)
+    n_trials_iter = range(60)
+    # n_trials_iter = range(8,30)
 
-
-    n_agents_iter = [3, 4]
+    n_agents_iter = [3,4,5,6,7,8]
     
-    # n_agents_iter = [3, 5, 7]
-    # n_agents_iter = [7]
-
-    admm_iters = [1, 3, 5, 10, 15]
-    # admm_iters = [3]
-    radius = 0.5
-    
+    admm_iters = [3]
+    radius = 0.2
     
     # Change the for loops into multi-processing?
 
     for n_agents in n_agents_iter:
         print(f"\tn_agents: {n_agents}")
         
-        if n_agents >=5 and n_agents <=7:
-             radius = 0.3
+        # if n_agents >=5 and n_agents <=7:
+        #      radius = 0.3
         
-        if n_agents >= 8 :
-             radius = 0.15
+        # if n_agents >= 8 :
+        #      radius = 0.15
             
         for i_trial in n_trials_iter:
             print(f"\t\ttrial: {i_trial}")
@@ -727,7 +721,7 @@ if __name__ == "__main__":
     
     ids = [100 + n for n in range(n_agents)] #Assigning random IDs for agents
     
-    Log_Data = True
+    Log_Data = False
     if not Log_Data:
         # admm_iter = 15
         # admm_iter = 5
