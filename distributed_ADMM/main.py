@@ -742,14 +742,16 @@ if __name__ == "__main__":
                                                             R,
                                                             Qf,
                                                             admm_iter)
+        
+        
         print(f'The average solve time is {avg_SolveTime} seconds!')
+        
+        np.savez("regular_ADMM_mpc_trj_data.npz", X_full = X_full, obj_sova = obj_centralized,  xr = xr, x_dims = x_dims)
+        
         #Plot trajectory
         plt.figure(dpi=150)
         dpilqr.plot_solve(X_full, float(obj_centralized), xr, x_dims, True, 3)
-        # plt.gca().set_zticks([0.8,1.2], minor=False)
-        plt.legend(plt.gca().get_children()[1:3], ["Start Position", "Goal Position"])
-        plt.savefig('regular_ADMM_mpc.png')
-        
+        plt.savefig('regular_ADMM_MPC_trj', bbox_inches='tight', dpi=300, transparent=True)
         
         plt.figure(dpi=150)
         dpilqr.plot_pairwise_distances(X_full, x_dims, n_dims, radius)
@@ -770,11 +772,11 @@ if __name__ == "__main__":
         
         print(f'The average solve time is {avg_SolveTime} seconds!')
         
+        np.savez("SOVA_ADMM_mpc_trj_data.npz", X_full = X_full, obj_sova = obj_sova,  xr = xr, x_dims = x_dims)
+        
         plt.figure(dpi=150)
         dpilqr.plot_solve(X_full, float(obj_sova), xr, x_dims, True, 3)
-        # plt.gca().set_zticks([0.8,1.2], minor=False)
-        plt.legend(plt.gca().get_children()[1:3], ["Start Position", "Goal Position"])
-        plt.savefig('SOVA_ADMM_mpc.png')
+        plt.savefig('SOVA_ADMM_mpc_trj', bbox_inches='tight', dpi=300, transparent=True)
         
         plt.figure(dpi=150)
         dpilqr.plot_pairwise_distances(X_full, x_dims, n_dims, radius)
