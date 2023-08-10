@@ -1,0 +1,2 @@
+i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,radius,        centralized,t_solve, t_solve_step, dist_to_goal
+0,3,3.1000000000000014,0,True,[8820.957],15,0.1,0.4,True,21.980539900017902,0.5131478677278445,[0.099 0.088 0.054],

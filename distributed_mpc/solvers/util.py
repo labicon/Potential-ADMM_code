@@ -23,7 +23,17 @@ def paper_setup_3_quads_2_humans(random=False):
     return x0, xf
     
 
-
+def paper_setup_2_quads(random = False):
+    
+    x0 = np.array([[0.5, 1.5, 1, 0, 0, 0,
+                    2.5, 1.5, 1, 0, 0, 0]], 
+                     dtype=float).T
+    xf = np.array([[2.5, 1.5, 1, 0, 0, 0, 
+                    0.5, 1.5, 1, 0, 0, 0]]).T
+    if random == True:
+        x0[dec.pos_mask([6]*2, 3)] += 0.05*np.random.randn(6, 1)
+        xf[dec.pos_mask([6]*2, 3)] += 0.05*np.random.randn(6, 1)
+    return x0, xf
 
 
 
@@ -397,7 +407,7 @@ def define_inter_graph_threshold(X, radius, x_dims, ids, n_dims=None):
     for each pair of agents sampled over the trajectory
     """
 
-    planning_radii = 2 * radius
+    planning_radii = 2.2 * radius
     
     if n_dims:
         rel_dists = np.array([compute_pairwise_distance_nd_Sym(X, x_dims, n_dims)])
