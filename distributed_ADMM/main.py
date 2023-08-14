@@ -30,7 +30,6 @@ from dpilqr.distributed import solve_rhc
 from dpilqr.problem import ilqrProblem
 from dpilqr.util import split_agents_gen, random_setup
 
-
 from solvers import util
 from multiprocessing import Process, Pipe
 from dynamics import linear_kinodynamics
@@ -512,7 +511,7 @@ def solve_mpc_centralized(n_agents, x0, xr, T, radius, Q, R, Qf, MAX_ITER, n_tri
         X0 = opti.parameter(x0.shape[0],1)     
         opti.subject_to(Y_state[0:nx] == X0)
         
-        cost_tot = cost + coll_cost/N + smooth_trj_cost
+        cost_tot = cost + coll_cost + smooth_trj_cost
         
         opti.minimize(cost_tot)
 
@@ -624,6 +623,45 @@ def multi_agent_run(trial,
     Qf = Q*500
     R = 0.1*np.eye(n_agents*n_inputs)
 
+    """DP-ILQR"""
+    ids = [100 + i for i in range(n_agents)]
+    model = QuadcopterDynamics6D
+    dt = 0.1
+    dynamics = MultiDynamicalModel([model(dt, id_) for id_ in ids])
+    Q_ilqr = np.diag([5., 5., 5., 1., 1., 1.])
+    Qf_ilqr = Q_ilqr * 500
+    R_ilqr = 0.1*np.eye(n_inputs)
+    goal_costs = [
+        ReferenceCost(xf_i, Q_ilqr.copy(), R_ilqr.copy(), Qf_ilqr.copy(), id_)
+        for xf_i, id_ in zip(split_agents_gen(xr, x_dims), ids)
+    ]
+    prox_cost = ProximityCost(x_dims, radius, n_dims)
+    game_cost = GameCost(goal_costs, prox_cost)
+    problem = ilqrProblem(dynamics, game_cost)
+    pool = None
+    STEP_SIZE=1
+    t_diverge = T * 30 * dt
+    t_kill = None
+    
+    n_d = 3
+    STEP_SIZE = 1
+    Xd, Ud, Jd = solve_rhc(
+        problem,
+        x0,
+        T,
+        centralized=False,
+        n_d = n_d,
+        step_size = STEP_SIZE,
+        radius = radius,
+        pool = None,
+        t_kill=t_kill,
+        dist_converge=0.1,
+        t_diverge=t_diverge,
+        i_trial=trial,
+        verbose=False,
+    )
+
+    """Centralized MPC baseline:"""
     X_full, U_full, obj,  avg_SolveTime, _ = solve_mpc_centralized(n_agents, 
                                                                 x0,
                                                                 xr, 
@@ -636,6 +674,8 @@ def multi_agent_run(trial,
                                                                 trial,
                                                                 )
     
+    
+    """Regular Consensus ADMM:"""
     # X_full, U_full, obj,  avg_SolveTime, _ = solve_admm_mpc(n_states,
     #                                             n_inputs,
     #                                             n_agents,
@@ -649,6 +689,7 @@ def multi_agent_run(trial,
     #                                             admm_iter,
     #                                             trial)
     
+    """ Potential ADMM:"""
     X_full, U_full, obj,  avg_SolveTime, _ = solve_distributed_rhc(ids, 
                                                                    n_states, 
                                                                    n_inputs, 
@@ -670,11 +711,11 @@ def monte_carlo_analysis():
     setup_logger()
 
     n_trials_iter = range(60)
-    # n_trials_iter = range(8,30)
 
     n_agents_iter = [3,4,5,6,7,8]
     
     admm_iters = [3]
+    # admm_iters = [10]
     radius = 0.2
     
     # Change the for loops into multi-processing?
@@ -721,7 +762,7 @@ if __name__ == "__main__":
     
     ids = [100 + n for n in range(n_agents)] #Assigning random IDs for agents
     
-    Log_Data = False
+    Log_Data = True
     if not Log_Data:
         # admm_iter = 15
         # admm_iter = 5
