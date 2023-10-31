@@ -13,7 +13,7 @@ from os import getpid
 import os
 from time import strftime
 
-from solvers.util import (
+from util import (
     compute_pairwise_distance_nd_Sym,
     define_inter_graph_threshold,
     distance_to_goal,
@@ -32,7 +32,6 @@ from dpilqr.util import split_agents_gen, random_setup
 
 from solvers import util
 from multiprocessing import Process, Pipe
-from dynamics import linear_kinodynamics
 
 opts = {'error_on_fail':False}
 
