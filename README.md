@@ -1,8 +1,22 @@
-# A potential-game approach to distributed trajectory optimization using nonlinear MPC and sequential convex programming
+# Code implementation for distributed Potential-ADMM
+ [![License:
+ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+ 
+Code for the paper: "Efficient and Distributed Multi-Agent Interactive Trajectory
+Optimization via ADMM and Dynamic Potential Games"
 
-## How to use
-This repository is based on the [Casadi](https://web.casadi.org/) pacakge. The goal is to achieve efficient real-time offline trajectory optimization leveraging both distributed MPC and distributed sequential convex programming. 
+## Installation
+You can recreate the python environment used to run these files via:
+```
+conda create --name <env> --file requirements.txt
+```
+
+Similiarily, using a standard Python 3 installation, you can also use:
+```
+python3 -m venv env
+source env/bin/activate
+pip install -r pipRequirements.txt
+```
 
 
-## Objective
-Different from conventional distributed MPC algorithms, we propose to solve the potential game of a subproblem which consists of agents in the same neighborhood. By leveraging the potential game, a neighborhood of multi-agent planning problem can be solved as a single-agent optimization problem. Instead of treating each agent as its own subproblem, our distributed MPC algorithm groups multiple agents into a cluster and solves its potential function. By doing so, we eliminate the need for a central node. The communication overhead is low because agents only exchange position information once before they solve their next optimization problem (in a receding horizon). For a more in-depth explanation on game-theoretic trajectory planning, please refer to the paper [Potential iLQR: A Potential-Minimizing Controller for Planning Multi-Agent Interactive Trajectories](https://arxiv.org/abs/2107.04926).
+
