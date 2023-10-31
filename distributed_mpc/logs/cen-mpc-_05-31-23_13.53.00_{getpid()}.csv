@@ -1,1 +1,0 @@
-i_trial,n_agents,t,failed_count,converged,objective_val,N,dt,radius,        centralized,t_solve, t_solve_step, dist_to_goal

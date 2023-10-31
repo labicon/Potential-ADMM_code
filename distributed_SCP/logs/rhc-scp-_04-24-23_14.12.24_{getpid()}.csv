@@ -1,2 +1,0 @@
-i_trial,n_agents,converged,objective_val,N,dt,radius,t_solve_step, dist_to_goal
-0,3,False,None,10,0.1,0.35,None,None,

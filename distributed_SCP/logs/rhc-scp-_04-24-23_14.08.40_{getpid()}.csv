@@ -1,4 +1,0 @@
-2023-04-24 14:08:40,660 INFO:root:i_trial,n_agents,converged,objective_val,N,dt,radius,t_solve_step, dist_to_goal
-2023-04-24 14:08:41,593 INFO:jax._src.xla_bridge:Unable to initialize backend 'rocm': NOT_FOUND: Could not find registered platform with name: "rocm". Available platform names are: Interpreter Host CUDA
-2023-04-24 14:08:41,594 INFO:jax._src.xla_bridge:Unable to initialize backend 'tpu': module 'jaxlib.xla_extension' has no attribute 'get_tpu_client'
-2023-04-24 14:08:41,594 INFO:jax._src.xla_bridge:Unable to initialize backend 'plugin': xla_extension has no attributes named get_plugin_device_client. Compile TensorFlow with //tensorflow/compiler/xla/python:enable_plugin_device set to true (defaults to false) to enable this.
