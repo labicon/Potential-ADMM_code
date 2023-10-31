@@ -30,7 +30,7 @@ from dpilqr.distributed import solve_rhc
 from dpilqr.problem import ilqrProblem
 from dpilqr.util import split_agents_gen, random_setup
 
-from solvers import util
+import util
 from multiprocessing import Process, Pipe
 
 opts = {'error_on_fail':False}
