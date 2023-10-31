@@ -4,3 +4,4 @@
 notebooks/
 #logs/
 env/
+distributed_ADMM/trials(scratch book)
