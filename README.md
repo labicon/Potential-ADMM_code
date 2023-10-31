@@ -19,6 +19,6 @@ pip install -r pipRequirements.txt
 ```
 
 ## Simulations
-To re-run the comparison between potential-ADMM and [distributed potential iLQR](https://ieeexplore.ieee.org/document/10161176), please install download the dp-ilqr repo [here](https://github.com/labicon/dp-ilqr)
+To re-run the comparison between potential-ADMM and [distributed potential iLQR](https://ieeexplore.ieee.org/document/10161176), please download the dp-ilqr repo [here](https://github.com/labicon/dp-ilqr)
 
 
