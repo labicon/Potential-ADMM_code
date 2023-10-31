@@ -2,8 +2,120 @@ import numpy as np
 import itertools
 from casadi import *
 import casadi as cs
-import dpilqr as dec
-from dpilqr import random_setup
+import random
+from scipy.spatial.transform import Rotation
+π = np.pi
+
+
+
+def randomize_locs(n_pts, random=False, rel_dist=3.0, var=3.0, n_d=2):
+    """Uniformly randomize locations of points in N-D while enforcing
+    a minimum separation between them.
+    """
+
+    # Distance to move away from center if we're too close.
+    Δ = 0.1 * n_pts
+    x = var * np.random.uniform(-1, 1, (n_pts, n_d))
+
+    if random:
+        return x
+    
+    # Determine the pair-wise indicies for an arbitrary number of agents.
+    pair_inds = np.array(list(itertools.combinations(range(n_pts), 2)))
+    move_inds = np.arange(n_pts)
+
+    # Keep moving points away from center until we satisfy radius
+    while move_inds.size:
+        center = np.mean(x, axis=0)
+        distances = compute_pairwise_distance(x.flatten(), [n_d] * n_pts).T
+
+        move_inds = pair_inds[distances.flatten() <= rel_dist]
+        x[move_inds] += Δ * (x[move_inds] - center)
+
+    return x
+
+
+def face_goal(x0, xf):
+    """Make the agents face the direction of their goal with a little noise"""
+
+    VAR = 0.01
+    dX = xf[:, :2] - x0[:, :2]
+    headings = np.arctan2(*np.rot90(dX, 1))
+
+    x0[:, -1] = headings + VAR * np.random.randn(x0.shape[0])
+    xf[:, -1] = headings + VAR * np.random.randn(x0.shape[0])
+
+    return x0, xf
+
+
+def random_setup(
+    n_agents, n_states, is_rotation=False, n_d=2, energy=None, do_face=False, **kwargs
+):
+    """Create a randomized set up of initial and final positions"""
+
+    # We don't have to normlize for energy here
+    x_i = randomize_locs(n_agents, n_d=n_d, **kwargs)
+
+    # Rotate the initial points by some amount about the center.
+    if is_rotation:
+        θ = π + random.uniform(-π / 4, π / 4)
+        R = Rotation.from_euler("z", θ).as_matrix()[:2, :2]
+        x_f = x_i @ R - x_i.mean(axis=0)
+    else:
+        x_f = randomize_locs(n_agents, n_d=n_d, **kwargs)
+
+    x0 = np.c_[x_i, np.zeros((n_agents, n_states - n_d))]
+    xf = np.c_[x_f, np.zeros((n_agents, n_states - n_d))]
+
+    if do_face:
+        x0, xf = face_goal(x0, xf)
+
+    x0 = x0.reshape(-1, 1)
+    xf = xf.reshape(-1, 1)
+
+    # Normalize to satisfy the desired energy of the problem.
+    if energy:
+        x0 = normalize_energy(x0, [n_states] * n_agents, energy, n_d)
+        xf = normalize_energy(xf, [n_states] * n_agents, energy, n_d)
+
+    return x0, xf
+
+
+def compute_energy(x, x_dims, n_d=2):
+    """Determine the sum of distances from the origin"""
+    return np.linalg.norm(x[pos_mask(x_dims, n_d)].reshape(-1, n_d), axis=1).sum()
+
+
+def normalize_energy(x, x_dims, energy=10.0, n_d=2):
+    """Zero-center the coordinates and then ensure the sum of
+    squared distances == energy
+    """
+
+    # Don't mutate x's data for this function, keep it pure.
+    x = x.copy()
+    n_agents = len(x_dims)
+    center = x[pos_mask(x_dims, n_d)].reshape(-1, n_d).mean(0)
+
+    x[pos_mask(x_dims, n_d)] -= np.tile(center, n_agents).reshape(-1, 1)
+    x[pos_mask(x_dims, n_d)] *= energy / compute_energy(x, x_dims, n_d)
+    assert x.size == sum(x_dims)
+
+    return x
+
+
+def perturb_state(x, x_dims, n_d=2, var=0.5):
+    """Add a little noise to the start to knock off perfect symmetries"""
+
+    x = x.copy()
+    x[pos_mask(x_dims, n_d)] += var * np.random.randn(*x[pos_mask(x_dims, n_d)].shape)
+
+    return x
+
+
+def pos_mask(x_dims, n_d=2):
+    """Return a mask that's true wherever there's a spatial position"""
+    return np.array([i % x_dims[0] < n_d for i in range(sum(x_dims))])
+
 
 def paper_setup_2_quads(random = False):
     
@@ -13,8 +125,8 @@ def paper_setup_2_quads(random = False):
     xf = np.array([[2.5, 1.5, 1, 0, 0, 0, 
                     0.5, 1.5, 1, 0, 0, 0]]).T
     if random == True:
-        x0[dec.pos_mask([6]*2, 3)] += 0.05*np.random.randn(6, 1)
-        xf[dec.pos_mask([6]*2, 3)] += 0.05*np.random.randn(6, 1)
+        x0[pos_mask([6]*2, 3)] += 0.05*np.random.randn(6, 1)
+        xf[pos_mask([6]*2, 3)] += 0.05*np.random.randn(6, 1)
     return x0, xf
 
 
@@ -28,8 +140,8 @@ def paper_setup_3_quads(random = False):
                     0.5, 1.5, 1, 0, 0, 0, 
                     1.5, 2.2, 1, 0, 0, 0]]).T
     if random == True:
-        x0[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
-        xf[dec.pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
+        x0[pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
+        xf[pos_mask([6]*3, 3)] += 0.05*np.random.randn(9, 1)
     return x0, xf
 
 def setup_3_quads():
@@ -74,8 +186,8 @@ def paper_setup_5_quads(random = False):
                    -1.1, 1.1, 1, 0, 0, 0]]).T
 
     if random == True:
-        x0[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
-        xf[dec.pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
+        x0[pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
+        xf[pos_mask([6]*5, 3)] += 0.05*np.random.randn(15, 1)
     
     return x0,xf
 
